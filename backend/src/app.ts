@@ -95,37 +95,79 @@ export const createApp = (): Application => {
   // ===========================================
   
   /**
+   * Required environment variables for production
+   */
+  const REQUIRED_ENV_KEYS = [
+    'MONGO_URI',
+    'AUTH0_DOMAIN',
+    'AUTH0_AUDIENCE',
+  ];
+
+  /**
+   * Optional but recommended environment variables
+   */
+  const OPTIONAL_ENV_KEYS = [
+    'CLOUDINARY_URL',
+    'OND_CHAT_KEY',
+    'OND_MEDIA_KEY',
+    'GEMINI_KEY',
+    'ELEVEN_KEY',
+  ];
+
+  /**
    * @route   GET /health
-   * @desc    Health check endpoint that verifies database connectivity
+   * @desc    Health check endpoint that verifies:
+   *          - MongoDB connection
+   *          - Required environment keys present
    * @access  Public
+   * @returns { status: 'ok' | 'degraded' | 'error', uptime, ... }
    */
   app.get('/health', async (_req: Request, res: Response) => {
     try {
+      // Check database connection
       const dbHealthy = await checkDatabaseHealth();
       
-      const healthStatus = {
-        status: dbHealthy ? 'healthy' : 'degraded',
+      // Check required environment keys
+      const missingRequired = REQUIRED_ENV_KEYS.filter(key => !process.env[key]);
+      const missingOptional = OPTIONAL_ENV_KEYS.filter(key => !process.env[key]);
+      const keysHealthy = missingRequired.length === 0;
+
+      // Determine overall status
+      const isHealthy = dbHealthy && keysHealthy;
+      const status = isHealthy ? 'ok' : (dbHealthy ? 'degraded' : 'error');
+      
+      const healthResponse = {
+        status,
+        uptime: Math.floor(process.uptime()),
         timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
         environment: process.env.NODE_ENV || 'development',
-        services: {
-          database: {
-            status: dbHealthy ? 'connected' : 'disconnected',
-          },
-        },
         version: process.env.npm_package_version || '1.0.0',
+        services: {
+          database: dbHealthy ? 'connected' : 'disconnected',
+          auth: process.env.AUTH0_DOMAIN ? 'configured' : 'missing',
+          storage: process.env.CLOUDINARY_URL ? 'configured' : 'missing',
+          chat: process.env.OND_CHAT_KEY ? 'configured' : 'missing',
+          media: process.env.OND_MEDIA_KEY ? 'configured' : 'missing',
+        },
+        ...(missingRequired.length > 0 && { missingRequired }),
+        ...(missingOptional.length > 0 && process.env.NODE_ENV === 'development' && { missingOptional }),
       };
 
-      if (dbHealthy) {
-        res.status(200).json(successResponse(healthStatus, 'Service is healthy'));
+      if (isHealthy) {
+        res.status(200).json(healthResponse);
+      } else if (dbHealthy) {
+        // DB healthy but missing some config
+        res.status(200).json(healthResponse);
       } else {
-        res.status(503).json(errorResponse('Database connection unhealthy', 503, 'SERVICE_UNAVAILABLE', healthStatus));
+        res.status(503).json(healthResponse);
       }
     } catch (error) {
       logger.error('Health check failed:', error);
-      res.status(503).json(
-        errorResponse('Health check failed', 503, 'SERVICE_UNAVAILABLE')
-      );
+      res.status(503).json({
+        status: 'error',
+        uptime: Math.floor(process.uptime()),
+        error: 'Health check failed',
+      });
     }
   });
 
