@@ -26,12 +26,30 @@ const jwksClient = jwksRsa.expressJwtSecret({
  * JWT validation middleware
  * Validates the JWT token from the Authorization header
  */
-export const validateJwt = expressjwt({
+/**
+ * JWT validation middleware
+ * Validates the JWT token from the Authorization header
+ * Supports MOCK_AUTH for testing without Valid Auth0 token
+ */
+const jwtMiddleware = expressjwt({
   secret: jwksClient,
   audience: AUTH0_AUDIENCE,
   issuer: `https://${AUTH0_DOMAIN}/`,
   algorithms: ['RS256'],
 });
+
+export const validateJwt = (req: any, res: Response, next: NextFunction) => {
+  if (process.env.MOCK_AUTH === 'true') {
+    logger.warn('⚠️ MOCK_AUTH enabled: Bypassing JWT validation');
+    req.auth = {
+      sub: 'mock-auth0-user-id',
+      email: 'mock@example.com',
+      name: 'Mock Test User',
+    };
+    return next();
+  }
+  return jwtMiddleware(req, res, next);
+};
 
 /**
  * Attach user middleware
@@ -50,21 +68,21 @@ export const attachUser = async (
     }
 
     const auth0Id = req.auth.sub;
-    
+
     // Extract email and name from token
     // Auth0 can include these in different claim namespaces
-    const email = (req.auth['email'] as string) || 
-                  (req.auth['https://your-namespace/email'] as string) || 
-                  `${auth0Id}@placeholder.com`;
-    
+    const email = (req.auth['email'] as string) ||
+      (req.auth['https://your-namespace/email'] as string) ||
+      `${auth0Id}@placeholder.com`;
+
     const name = (req.auth['name'] as string) ||
-                 (req.auth['https://your-namespace/name'] as string) ||
-                 (req.auth['nickname'] as string) ||
-                 undefined;
-    
+      (req.auth['https://your-namespace/name'] as string) ||
+      (req.auth['nickname'] as string) ||
+      undefined;
+
     // Find or create user
     let user = await User.findOne({ auth0Id });
-    
+
     if (!user) {
       // Create new user on first login
       user = await User.create({
@@ -74,7 +92,7 @@ export const attachUser = async (
         createdAt: new Date(),
         lastLogin: new Date(),
       });
-      
+
       logger.info(`New user created: ${auth0Id}`);
     } else {
       // Update last login and sync name/email if changed
@@ -116,7 +134,7 @@ export const optionalAuth = async (
   next: NextFunction
 ): Promise<void> => {
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     // No token provided, continue without authentication
     next();
@@ -133,7 +151,7 @@ export const optionalAuth = async (
         next();
         return;
       }
-      
+
       // Token valid, attach user
       await attachUser(req, res, next);
     });
@@ -149,7 +167,7 @@ export const optionalAuth = async (
 export const requirePermissions = (...requiredPermissions: string[]) => {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     const userPermissions = req.auth?.permissions || [];
-    
+
     const hasAllPermissions = requiredPermissions.every(
       (permission) => userPermissions.includes(permission)
     );

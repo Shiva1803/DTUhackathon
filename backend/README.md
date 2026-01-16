@@ -23,6 +23,37 @@ Server runs at `http://localhost:3001`
 
 ---
 
+## 🤖 OnDemand Agents Architecture
+
+This platform is powered by intelligent AI agents built on **OnDemand.io APIs**.
+
+### Active Agents
+
+| Agent | ID | Purpose |
+|-------|-----|---------|
+| **TranscriptionAgent** | `transcription-whisper-v1` | Converts audio to text via OnDemand Media API |
+| **CategorizationAgent** | `categorization-gemini-v2` | Classifies activities using Gemini AI |
+| **SummarizationAgent** | `summary-narrative-v1` | Generates weekly insights + TTS audio |
+| **ChatAgent** | `chat-gpt4o-v1` | Conversational AI via OnDemand Chat API |
+
+### Stretch Goal Agents
+
+| Agent | ID | Status |
+|-------|-----|--------|
+| **SchedulerAgent** | `scheduler-weekly-v1` | 🔮 Automated email summaries |
+| **InsightsAgent** | `insights-trends-v1` | 🔮 Trend mining across users |
+
+### Agent Flow
+```
+Audio Upload → TranscriptionAgent → CategorizationAgent → Database
+                                                            ↓
+User Query → ChatAgent ←─────────────────────────────────────┘
+                                                            ↓
+Weekly Trigger → SummarizationAgent → Narrative + TTS Audio
+```
+
+---
+
 ## Environment Variables
 
 | Variable | Required | Description |
