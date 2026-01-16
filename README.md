@@ -1,16 +1,29 @@
-# GrowthAmp - AI-Powered Personal Growth Journal
+# Parallax - AI-Powered Personal Growth Journal
 
-An AI-powered personal growth application that transforms daily voice reflections into actionable insights. Record 60-second audio logs, get AI-powered transcription and categorization, and receive weekly summaries with trends and recommendations.
+An AI-powered personal growth application that transforms daily voice reflections into actionable insights. Record audio logs, get AI-powered transcription and activity tracking, and receive personalized reviews based on your growth patterns.
+
+## 🌐 Live Demo
+
+- **Frontend**: [https://parallax.vercel.app](https://parallax.vercel.app) _(Deploy to get your URL)_
+- **API**: [https://api.parallax.app](https://api.parallax.app) _(Configure your domain)_
+- **Health Check**: [https://api.parallax.app/health](https://api.parallax.app/health)
+
+> **Note**: Replace with your actual deployment URLs after following the [Deployment Guide](./DEPLOYMENT.md)
 
 ## 🚀 Features
 
-- **Voice Journaling**: Record 60-second daily audio reflections
+- **Voice Journaling**: Record daily audio reflections
 - **AI Transcription**: Automatic speech-to-text via OnDemand Media API
-- **Smart Categorization**: AI categorizes entries (work, health, learning, etc.)
-- **Sentiment Analysis**: Track emotional patterns over time
+- **3-Step Activity Tracking**: 
+  - Extract activities from your transcript
+  - Classify into 5 categories (Growth, Health, Work, Consumption, Other)
+  - Get personalized reviews based on patterns
+- **Smart Categorization**: AI categorizes entries with sentiment analysis
 - **Weekly Summaries**: AI-generated narrative summaries with insights
 - **Text-to-Speech**: Listen to your weekly summary (ElevenLabs)
 - **Secure Auth**: Auth0 authentication with JWT tokens
+- **Beautiful UI**: Dark/Light themes with desert dust particles
+- **Streak Tracking**: Monitor your consistency with daily streaks
 
 ## 🏗️ Architecture
 
@@ -173,11 +186,17 @@ npm run dev
 | GET | `/api/log/:id` | Get specific audio log |
 | DELETE | `/api/log/:id` | Delete audio log |
 
+### Activity Tracking
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/summary/activities` | Get activity summary (5 categories, last 20 logs) |
+| POST | `/api/summary/activities/review` | Generate fresh personal review |
+
 ### Summaries
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/summary/:weekId` | Get weekly summary (YYYY-WNN format) |
-| GET | `/api/summary` | List all summaries |
+| GET | `/api/summary` | Get current week summary |
 | POST | `/api/summary/generate` | Trigger summary generation |
 
 ### Chat
@@ -208,17 +227,62 @@ curl -H "Authorization: Bearer TOKEN" http://localhost:3001/api/auth/me
 ## 📱 Pages
 
 1. **Landing** (`/`) - Public landing page with login
-2. **Daily Log** (`/log`) - Record audio reflections
-3. **Success** (`/success`) - Upload confirmation
-4. **Summary** (`/summary`) - Weekly insights & metrics
+2. **Dashboard** (`/dashboard`) - Overview with streak tracking
+3. **Daily Log** (`/log`) - Record audio reflections with title input
+4. **Success** (`/success`) - Upload confirmation with celebration
+5. **History** (`/logs`) - View all past recordings with delete functionality
+6. **Summary** (`/summary`) - Activity tracking with 5 categories and personal review
+7. **Chat** (`/chat`) - AI chat assistant for reflections
 
 ## 🎨 Design System
 
-- **Colors**: Dark theme with purple→cyan gradients
-- **Typography**: System fonts with Tailwind defaults
+- **Dark Mode**: Pure black (#000000) with cyan accent (#00d4ff)
+- **Light Mode**: Desert sand (#F5E6D3) with golden brown accent (#8B6914)
+- **Typography**: Space Grotesk for headings, Inter for body
 - **Animations**: Framer Motion for smooth transitions
 - **Icons**: Lucide React icon library
+- **Particles**: Parallax stars (dark) / Desert dust (light)
 
 ## 📄 License
 
 MIT License
+
+---
+
+## 🚀 Deployment
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete deployment instructions.
+
+**Quick Deploy:**
+- Backend: Vultr VPS with PM2
+- Frontend: Vercel (one-click deploy)
+- Database: MongoDB Atlas
+- SSL: Let's Encrypt (free)
+
+---
+
+## 📊 Project Status
+
+- ✅ Core features implemented
+- ✅ 3-step activity tracking system
+- ✅ Dark/Light theme with animations
+- ✅ Production-ready deployment configs
+- ✅ Comprehensive documentation
+- 🚧 Demo deployment in progress
+
+---
+
+## 👥 Team
+
+Built for DTU Hackathon 2026
+
+---
+
+## 🙏 Acknowledgments
+
+- Auth0 for authentication
+- MongoDB Atlas for database
+- Cloudinary for media storage
+- Google Gemini for AI capabilities
+- OnDemand for transcription services
+- ElevenLabs for text-to-speech
