@@ -171,6 +171,7 @@ export default function SummaryPage() {
 
   useEffect(() => {
     fetchSummary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAudioToggle = () => {

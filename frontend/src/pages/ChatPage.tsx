@@ -53,6 +53,7 @@ export default function ChatPage() {
     // Load sessions on mount
     useEffect(() => {
         loadSessions();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const getToken = async () => {

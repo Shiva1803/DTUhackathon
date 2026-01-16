@@ -59,6 +59,17 @@ export class AIService {
    * @param transcript - Text to categorize
    */
   async categorizeTranscript(transcript: string): Promise<CategorizationResult> {
+    // Handle missing or empty transcript
+    if (!transcript || transcript.trim().length === 0) {
+      logger.warn('Empty transcript provided for categorization');
+      return {
+        category: 'uncategorized',
+        confidence: 0,
+        sentiment: 'neutral',
+        keywords: [],
+      };
+    }
+
     try {
       const prompt = `Analyze the following transcript and provide:
 1. A category (one of: health, work, personal, family, social, finance, learning, other)
@@ -68,7 +79,7 @@ export class AIService {
 
 Transcript: "${transcript}"
 
-Respond in JSON format:
+Respond in JSON format only, no markdown or code blocks:
 {
   "category": "string",
   "confidence": number,
@@ -97,6 +108,74 @@ Respond in JSON format:
         sentiment: 'neutral',
         keywords: [],
       };
+    }
+  }
+
+  /**
+   * Categorize all activities for a week (batch processing)
+   * Concatenates transcripts and provides overall categorization
+   * @param userId - User's MongoDB ObjectId
+   * @param weekStart - Start of the week
+   */
+  async categorizeWeekActivities(
+    userId: string,
+    weekStart: Date
+  ): Promise<{ categories: Record<string, number>; processed: number }> {
+    try {
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 7);
+
+      // Get all uncategorized logs for the week
+      const logs = await AudioLog.find({
+        userId: new mongoose.Types.ObjectId(userId),
+        timestamp: { $gte: weekStart, $lt: weekEnd },
+        $or: [{ category: { $exists: false } }, { category: null }, { category: '' }],
+      });
+
+      if (logs.length === 0) {
+        logger.info(`No uncategorized logs found for user ${userId} in week starting ${weekStart}`);
+        return { categories: {}, processed: 0 };
+      }
+
+      logger.info(`Categorizing ${logs.length} logs for user ${userId}`);
+
+      const categories: Record<string, number> = {};
+      let processed = 0;
+
+      // Process each log asynchronously
+      const categorizationPromises = logs.map(async (log) => {
+        // Handle missing transcript
+        if (!log.transcript || log.transcript.trim().length === 0) {
+          log.category = 'uncategorized';
+          log.sentiment = 'neutral';
+          if (!log.metadata) log.metadata = {};
+          log.metadata.categoryConfidence = 0;
+          await log.save();
+          categories['uncategorized'] = (categories['uncategorized'] || 0) + 1;
+          return;
+        }
+
+        const result = await this.categorizeTranscript(log.transcript);
+
+        log.category = result.category;
+        log.sentiment = result.sentiment;
+        if (!log.metadata) log.metadata = {};
+        log.metadata.keywords = result.keywords;
+        log.metadata.categoryConfidence = result.confidence;
+
+        await log.save();
+        categories[result.category] = (categories[result.category] || 0) + 1;
+        processed++;
+      });
+
+      // Wait for all categorizations to complete
+      await Promise.all(categorizationPromises);
+
+      logger.info(`Week categorization complete: ${processed} logs processed`, { categories });
+      return { categories, processed };
+    } catch (error) {
+      logger.error('Error categorizing week activities:', error);
+      throw error;
     }
   }
 
@@ -311,15 +390,23 @@ Write a narrative that:
       });
 
       if (!response.ok) {
-        throw new Error(`Eleven Labs API error: ${response.status}`);
+        const status = response.status;
+
+        // Handle rate limiting (429)
+        if (status === 429) {
+          logger.warn('ElevenLabs rate limit reached (429) - skipping TTS generation');
+          return undefined;
+        }
+
+        throw new Error(`Eleven Labs API error: ${status}`);
       }
 
       // Get audio buffer from response
       const audioBuffer = Buffer.from(await response.arrayBuffer());
-      
+
       // Upload to Cloudinary
       const cloudinary = await import('cloudinary');
-      
+
       return new Promise<string | undefined>((resolve) => {
         const uploadStream = cloudinary.v2.uploader.upload_stream(
           {
@@ -486,18 +573,41 @@ Be warm, supportive, and non-judgmental. Ask thoughtful follow-up questions when
 
   /**
    * Parse JSON from AI response
+   * Strips markdown formatting and extracts clean JSON
    */
   private parseJsonResponse<T>(text: string): T {
+    // Strip markdown code blocks if present
+    let cleanText = text
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .replace(/^\s*`+|`+\s*$/g, '')
+      .trim();
+
     // Try to extract JSON from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[0]) as T;
-      } catch {
-        logger.warn('Failed to parse JSON from AI response');
+      } catch (e) {
+        logger.warn('Failed to parse JSON from AI response:', e);
       }
     }
+
+    logger.warn('No valid JSON found in AI response');
     return {} as T;
+  }
+
+  /**
+   * Strip formatting from text (quotes, markdown, etc.)
+   */
+  private stripTextFormatting(text: string): string {
+    return text
+      .replace(/^["'`]+|["'`]+$/g, '')  // Remove leading/trailing quotes
+      .replace(/\*\*/g, '')              // Remove bold markdown
+      .replace(/\*/g, '')                // Remove italic markdown
+      .replace(/^#+\s*/gm, '')           // Remove heading markers
+      .replace(/\n{3,}/g, '\n\n')        // Reduce multiple newlines
+      .trim();
   }
 
   /**

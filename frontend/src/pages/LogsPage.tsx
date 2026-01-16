@@ -97,6 +97,7 @@ export default function LogsPage() {
 
     useEffect(() => {
         fetchLogs();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handlePlayPause = (log: AudioLog) => {

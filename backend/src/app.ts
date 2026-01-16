@@ -3,8 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { checkDatabaseHealth } from './config/database';
-import { authRoutes, logRoutes, summaryRoutes, chatRoutes } from './routes';
+import { authRoutes, logRoutes, summaryRoutes, chatRoutes, shareRoutes } from './routes';
 import { notFoundHandler, errorHandler } from './middleware/error.middleware';
+import { requestLogger, errorLogger } from './middleware/logging.middleware';
 import { logger } from './utils/logger';
 import { successResponse, errorResponse } from './utils/response';
 
@@ -17,7 +18,7 @@ export const createApp = (): Application => {
   // ===========================================
   // Security Middleware
   // ===========================================
-  
+
   // Helmet for security headers
   app.use(helmet({
     contentSecurityPolicy: {
@@ -44,7 +45,7 @@ export const createApp = (): Application => {
   // ===========================================
   // Performance Middleware
   // ===========================================
-  
+
   // Compression
   app.use(compression({
     filter: (req, res) => {
@@ -59,41 +60,23 @@ export const createApp = (): Application => {
   // ===========================================
   // Body Parsing Middleware
   // ===========================================
-  
+
   // JSON body parser
   app.use(express.json({ limit: '10mb' }));
-  
+
   // URL-encoded body parser
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // ===========================================
-  // Request Logging
+  // Request Logging (using Winston)
   // ===========================================
-  
-  app.use((req: Request, res: Response, next) => {
-    const start = Date.now();
-    
-    res.on('finish', () => {
-      const duration = Date.now() - start;
-      const logLevel = res.statusCode >= 400 ? 'warn' : 'http';
-      
-      logger.log(logLevel, `${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`, {
-        method: req.method,
-        url: req.originalUrl,
-        status: res.statusCode,
-        duration,
-        ip: req.ip,
-        userAgent: req.get('user-agent'),
-      });
-    });
-    
-    next();
-  });
+
+  app.use(requestLogger);
 
   // ===========================================
   // Health Check Endpoint
   // ===========================================
-  
+
   /**
    * Required environment variables for production
    */
@@ -126,7 +109,7 @@ export const createApp = (): Application => {
     try {
       // Check database connection
       const dbHealthy = await checkDatabaseHealth();
-      
+
       // Check required environment keys
       const missingRequired = REQUIRED_ENV_KEYS.filter(key => !process.env[key]);
       const missingOptional = OPTIONAL_ENV_KEYS.filter(key => !process.env[key]);
@@ -135,7 +118,7 @@ export const createApp = (): Application => {
       // Determine overall status
       const isHealthy = dbHealthy && keysHealthy;
       const status = isHealthy ? 'ok' : (dbHealthy ? 'degraded' : 'error');
-      
+
       const healthResponse = {
         status,
         uptime: Math.floor(process.uptime()),
@@ -174,19 +157,20 @@ export const createApp = (): Application => {
   // ===========================================
   // API Routes
   // ===========================================
-  
+
   // Auth routes
   app.use('/api/auth', authRoutes);
-  
+
   // API routes
   app.use('/api/log', logRoutes);
   app.use('/api/summary', summaryRoutes);
   app.use('/api/chat', chatRoutes);
+  app.use('/api/share', shareRoutes);
 
   // ===========================================
   // Root endpoint
   // ===========================================
-  
+
   app.get('/', (_req: Request, res: Response) => {
     res.json(successResponse({
       name: 'Backend API',
@@ -199,10 +183,13 @@ export const createApp = (): Application => {
   // ===========================================
   // Error Handling
   // ===========================================
-  
+
   // 404 handler for undefined routes
   app.use(notFoundHandler);
-  
+
+  // Error logger (logs detailed error information)
+  app.use(errorLogger);
+
   // Global error handler (must be last)
   app.use(errorHandler);
 

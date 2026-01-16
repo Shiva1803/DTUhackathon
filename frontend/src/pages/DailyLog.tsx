@@ -16,7 +16,7 @@ interface Toast {
 export default function DailyLog() {
   const navigate = useNavigate();
   const { getAccessTokenSilently, isAuthenticated } = useAuth0();
-  
+
   const [state, setState] = useState<RecordingState>('idle');
   const [timeLeft, setTimeLeft] = useState(60);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -65,7 +65,7 @@ export default function DailyLog() {
       streamRef.current = null;
     }
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current.close().catch(() => { });
       audioContextRef.current = null;
     }
     mediaRecorderRef.current = null;
@@ -74,7 +74,7 @@ export default function DailyLog() {
 
   const uploadAudio = async (blob: Blob) => {
     setState('uploading');
-    
+
     try {
       if (!isAuthenticated) {
         throw new Error('Not authenticated');
@@ -87,25 +87,22 @@ export default function DailyLog() {
           scope: 'openid profile email',
         }
       });
-      
+
       // Determine the actual MIME type from the blob
       const mimeType = blob.type || 'audio/webm';
-      const extension = mimeType.includes('webm') ? 'webm' : 
-                       mimeType.includes('mp3') ? 'mp3' : 
-                       mimeType.includes('wav') ? 'wav' : 'webm';
-      
+      const extension = mimeType.includes('webm') ? 'webm' :
+        mimeType.includes('mp3') ? 'mp3' :
+          mimeType.includes('wav') ? 'wav' : 'webm';
+
       const file = new File([blob], `log-${Date.now()}.${extension}`, { type: mimeType });
       const formData = new FormData();
       formData.append('audio', file);
 
-      console.log('Uploading audio:', { type: mimeType, size: blob.size, extension });
-      
-      const response = await uploadAudioLog(formData, token);
-      console.log('Upload response:', response.data);
-      
+      await uploadAudioLog(formData, token);
+
       setState('success');
       showToast('Log uploaded successfully!', 'success');
-      
+
       // Navigate to success page after brief delay
       setTimeout(() => {
         navigate('/success');
@@ -113,13 +110,13 @@ export default function DailyLog() {
     } catch (error) {
       console.error('Upload error:', error);
       setState('error');
-      
+
       let message = 'Upload failed. Please try again.';
-      
+
       if (error instanceof AxiosError) {
         const status = error.response?.status;
         const errorData = error.response?.data;
-        
+
         if (status === 401) {
           message = 'Session expired. Please log in again.';
         } else if (status === 400) {
@@ -138,7 +135,7 @@ export default function DailyLog() {
       } else if (error instanceof Error) {
         message = error.message;
       }
-      
+
       showToast(message, 'error');
       setTimeout(() => setState('idle'), 3000);
     }
@@ -146,13 +143,13 @@ export default function DailyLog() {
 
   const updateAudioLevel = useCallback(() => {
     if (!analyserRef.current) return;
-    
+
     const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
     analyserRef.current.getByteFrequencyData(dataArray);
-    
+
     const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
     setAudioLevel(average / 255);
-    
+
     animationRef.current = requestAnimationFrame(updateAudioLevel);
   }, []);
 
@@ -163,12 +160,12 @@ export default function DailyLog() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           sampleRate: 44100,
-        } 
+        }
       });
       streamRef.current = stream;
 
@@ -196,18 +193,17 @@ export default function DailyLog() {
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        console.log('Recording stopped, blob size:', blob.size);
-        
+
         // Clean up stream but keep other refs for upload
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
           streamRef.current = null;
         }
         if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-          audioContextRef.current.close().catch(() => {});
+          audioContextRef.current.close().catch(() => { });
           audioContextRef.current = null;
         }
-        
+
         uploadAudio(blob);
       };
 
@@ -395,7 +391,7 @@ export default function DailyLog() {
                 style={{ inset: -20 }}
               />
             )}
-            
+
             {/* Pulsing ring when recording */}
             {state === 'recording' && (
               <motion.div
@@ -414,8 +410,8 @@ export default function DailyLog() {
               className={`
                 relative w-32 h-32 md:w-40 md:h-40 rounded-full flex items-center justify-center
                 transition-all duration-300 shadow-2xl
-                ${state === 'recording' 
-                  ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30' 
+                ${state === 'recording'
+                  ? 'bg-red-500 hover:bg-red-600 shadow-red-500/30'
                   : state === 'uploading' || state === 'success' || !backendAvailable
                     ? 'bg-gray-700 cursor-not-allowed'
                     : 'bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-600 hover:to-cyan-600 shadow-purple-500/30'

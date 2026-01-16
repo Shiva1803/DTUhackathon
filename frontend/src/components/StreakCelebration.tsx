@@ -33,9 +33,19 @@ export default function StreakCelebration({ streak, onClose }: StreakCelebration
         return () => window.removeEventListener('resize', updateSize);
     }, []);
 
+    // Show celebration when milestone is reached
     useEffect(() => {
-        if (isMilestone) {
-            setShowCelebration(true);
+        if (isMilestone && !showCelebration) {
+            // Use requestAnimationFrame to defer state update
+            const frameId = requestAnimationFrame(() => {
+                setShowCelebration(true);
+            });
+            return () => cancelAnimationFrame(frameId);
+        }
+    }, [isMilestone, showCelebration]);
+
+    useEffect(() => {
+        if (showCelebration) {
             // Auto-hide after 5 seconds
             const timer = setTimeout(() => {
                 setShowCelebration(false);
@@ -43,7 +53,7 @@ export default function StreakCelebration({ streak, onClose }: StreakCelebration
             }, 5000);
             return () => clearTimeout(timer);
         }
-    }, [streak, isMilestone, onClose]);
+    }, [showCelebration, onClose]);
 
     const getMilestoneMessage = () => {
         if (streak >= 30) return { title: '🏆 Legendary Streak!', subtitle: `${streak} days of consistency!` };

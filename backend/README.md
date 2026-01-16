@@ -253,3 +253,88 @@ All errors return:
 | 403 | Forbidden / insufficient permissions |
 | 404 | Resource not found |
 | 500 | Server error |
+
+---
+
+## OnDemand AI Agents
+
+This application integrates **6 OnDemand AI agents** to meet hackathon criteria:
+
+### Core Agents (6 Total)
+
+| # | Agent | Function | API Used | Trigger |
+|---|-------|----------|----------|---------|
+| 1 | **TranscriptionAgent** | Converts audio to text | OnDemand Media API | Audio upload |
+| 2 | **CategorizationAgent** | Categorizes transcripts | Gemini 2.5 Flash | After transcription |
+| 3 | **SummarizationAgent** | Generates weekly narrative | Gemini + ElevenLabs | Summary request |
+| 4 | **ChatAgent** | Conversational AI queries | OnDemand Chat API | Chat message |
+| 5 | **StreakAgent** | Tracks user engagement | MongoDB + Logic | Log upload |
+| 6 | **ShareCardAgent** | Generates shareable images | Canvas + Cloudinary | Share request |
+
+### Tool Integrations (4 Types)
+
+| # | Tool | Purpose | API/SDK |
+|---|------|---------|---------|
+| 1 | **Speech-to-Text** | Audio transcription | OnDemand Media API |
+| 2 | **Chat AI** | Conversational responses | OnDemand Chat API |
+| 3 | **Text Generation** | Categorization & summarization | Google Gemini API |
+| 4 | **Text-to-Speech** | Audio summaries | ElevenLabs API |
+
+### Agent Details
+
+#### 1. TranscriptionAgent
+- **API**: OnDemand Media API (`speech_to_text`)
+- **Endpoint**: `POST https://api.on-demand.io/services/v1/public/service/execute/speech_to_text`
+- **Input**: Audio URL (from Cloudinary)
+- **Output**: Transcript text
+- **File**: `audio.service.ts` → `transcribeAudioFromUrl()`
+
+#### 2. CategorizationAgent
+- **API**: Gemini 2.5 Flash
+- **Function**: Analyzes transcripts for category, sentiment, and keywords
+- **Categories**: health, work, personal, family, social, finance, learning, other
+- **File**: `ai.service.ts` → `categorizeTranscript()`
+
+#### 3. SummarizationAgent
+- **API**: Gemini 2.5 Flash + ElevenLabs TTS
+- **Function**: Generates personalized weekly story narrative
+- **Output**: Story text + optional TTS audio URL
+- **File**: `ai.service.ts` → `generateWeeklySummary()`
+
+#### 4. ChatAgent
+- **API**: OnDemand Chat API (GPT-4o)
+- **Endpoint**: `POST https://api.on-demand.io/chat/v1/sessions/{sessionId}/query`
+- **Features**: Context-aware responses, follow-up suggestions
+- **File**: `chat.service.ts` → `sendMessage()`
+
+#### 5. StreakAgent
+- **Logic**: Tracks consecutive days of logging
+- **Function**: Updates user streak count on each log
+- **Rules**: Increments if logged yesterday, resets if >24h gap
+- **File**: `User.ts` → `updateStreak()` method
+
+#### 6. ShareCardAgent
+- **API**: Node Canvas + Cloudinary
+- **Function**: Generates beautiful shareable image cards
+- **Output**: PNG image URL with stats overlay
+- **File**: `share.service.ts` → `generateShareCard()`
+
+### API Endpoints
+
+| Endpoint | Agent(s) Used |
+|----------|---------------|
+| `POST /api/log` | TranscriptionAgent, CategorizationAgent, StreakAgent |
+| `GET /api/summary/:weekId` | SummarizationAgent |
+| `POST /api/chat` | ChatAgent |
+| `POST /api/share/card` | ShareCardAgent |
+
+### Agent Configuration
+
+```bash
+# Required API Keys
+OND_CHAT_KEY=your_chat_api_key      # ChatAgent
+OND_MEDIA_KEY=your_media_api_key    # TranscriptionAgent
+GEMINI_KEY=your_gemini_key          # CategorizationAgent, SummarizationAgent
+ELEVEN_KEY=your_elevenlabs_key      # SummarizationAgent TTS
+CLOUDINARY_URL=cloudinary://...     # TranscriptionAgent, ShareCardAgent
+```
