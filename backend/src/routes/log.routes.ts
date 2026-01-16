@@ -11,51 +11,109 @@ import { logger } from '../utils/logger';
 const router = Router();
 
 /**
+ * Allowed audio MIME types (MP3 and WAV only)
+ */
+const ALLOWED_AUDIO_TYPES = [
+  'audio/mp3',
+  'audio/mpeg',      // MP3
+  'audio/wav',
+  'audio/x-wav',     // WAV
+  'audio/wave',
+];
+
+/**
+ * Max file size: 10MB
+ */
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+/**
  * Multer configuration for audio file uploads
- * Stores files in memory for processing
+ * - Accepts single file in 'audio' field
+ * - Stores files in memory for processing
+ * - Limits to MP3/WAV, max 10MB
  */
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max file size
+    fileSize: MAX_FILE_SIZE,
   },
   fileFilter: (_req, file, cb) => {
-    // Accept audio files
-    const allowedMimeTypes = [
-      'audio/webm',
-      'audio/wav',
-      'audio/x-wav',
-      'audio/mp3',
-      'audio/mpeg',
-      'audio/ogg',
-      'audio/flac',
-      'audio/m4a',
-      'audio/x-m4a',
-      'audio/mp4',
-    ];
-
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    if (ALLOWED_AUDIO_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new ValidationError(`Invalid file type: ${file.mimetype}. Allowed types: ${allowedMimeTypes.join(', ')}`));
+      cb(new ValidationError(
+        `Invalid file type: ${file.mimetype}. Only MP3 and WAV files are allowed.`
+      ));
     }
   },
 });
 
 /**
+ * Handle multer errors (file size, etc.)
+ */
+const handleMulterError = (err: Error, res: Response): boolean => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: `File too large. Maximum size is ${MAX_FILE_SIZE / (1024 * 1024)}MB.`,
+          statusCode: 400,
+          code: 'FILE_TOO_LARGE',
+        },
+      });
+      return true;
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      res.status(400).json({
+        success: false,
+        error: {
+          message: 'Unexpected field. Use "audio" as the field name for file upload.',
+          statusCode: 400,
+          code: 'UNEXPECTED_FIELD',
+        },
+      });
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
  * @route   POST /api/log
  * @desc    Upload audio file for transcription and logging
- *          1. Uploads audio to Cloudinary (if configured)
- *          2. Calls OnDemand Media API for transcription
- *          3. Saves transcript to AudioLog model
+ *          1. Accept single audio file (field: "audio")
+ *          2. Validate file type (MP3, WAV) and size (< 10MB)
+ *          3. Upload to Cloudinary (or local storage for dev)
+ *          4. Call transcribeAudio(audioUrl) service
+ *          5. Save AudioLog { userId, transcript, timestamp }
+ *          6. Respond { success: true, message: "Log uploaded", logId }
  * @access  Private
  * @body    multipart/form-data with 'audio' field
  */
 router.post(
   '/',
   authenticate,
-  upload.single('audio'),
+  (req: AuthenticatedRequest, res: Response, next: (err?: Error) => void) => {
+    // Custom wrapper to handle multer errors properly
+    upload.single('audio')(req, res, (err) => {
+      if (err) {
+        if (handleMulterError(err, res)) return;
+        if (err instanceof ValidationError) {
+          res.status(400).json({
+            success: false,
+            error: { message: err.message, statusCode: 400 },
+          });
+          return;
+        }
+        next(err);
+        return;
+      }
+      next();
+    });
+  },
   asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    // Error: Missing authentication
     if (!req.user) {
       res.status(401).json({
         success: false,
@@ -64,10 +122,15 @@ router.post(
       return;
     }
 
+    // Error: Missing file
     if (!req.file) {
       res.status(400).json({
         success: false,
-        error: { message: 'No audio file provided. Use multipart/form-data with "audio" field.', statusCode: 400 },
+        error: {
+          message: 'No audio file provided. Use multipart/form-data with "audio" field.',
+          statusCode: 400,
+          code: 'MISSING_FILE',
+        },
       });
       return;
     }
@@ -78,34 +141,67 @@ router.post(
       mimetype: req.file.mimetype,
     });
 
-    // Process the audio upload:
-    // 1. Upload to Cloudinary
-    // 2. Transcribe via OnDemand Media API
-    // 3. Save to AudioLog
-    const result = await audioService.processAudioUpload(
-      req.user.id,
-      req.file.buffer,
-      req.file.mimetype,
-      req.file.originalname
-    );
+    try {
+      // Process the audio upload:
+      // 1. Upload to Cloudinary (if configured, else skip)
+      // 2. Transcribe via OnDemand Media API
+      // 3. Save to AudioLog
+      const result = await audioService.processAudioUpload(
+        req.user.id,
+        req.file.buffer,
+        req.file.mimetype,
+        req.file.originalname
+      );
 
-    // Optionally categorize the transcript asynchronously
-    // This could also be done via a job queue in production
-    aiService.categorizeAudioLog(result.audioLog._id.toString(), req.user.id)
-      .catch((error) => logger.error('Background categorization failed:', error));
+      // Optionally categorize the transcript asynchronously
+      aiService.categorizeAudioLog(result.audioLog._id.toString(), req.user.id)
+        .catch((error) => logger.error('Background categorization failed:', error));
 
-    res.status(201).json(
-      successResponse(
-        {
-          id: result.audioLog._id.toString(),
+      // Success response: { success: true, message: "Log uploaded", logId }
+      res.status(201).json({
+        success: true,
+        message: 'Log uploaded',
+        logId: result.audioLog._id.toString(),
+        data: {
           transcript: result.transcript,
           duration: result.duration,
           audioUrl: result.audioUrl,
           timestamp: result.audioLog.timestamp,
         },
-        'Audio log created successfully'
-      )
-    );
+      });
+    } catch (error) {
+      // Error: Cloudinary/upload failure or transcription failure
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('Cloudinary')) {
+        logger.error('Cloudinary upload failure:', error);
+        res.status(500).json({
+          success: false,
+          error: {
+            message: 'Failed to upload audio file to storage.',
+            statusCode: 500,
+            code: 'UPLOAD_FAILURE',
+          },
+        });
+        return;
+      }
+
+      if (errorMessage.includes('Transcription') || errorMessage.includes('transcription')) {
+        logger.error('Transcription failure:', error);
+        res.status(500).json({
+          success: false,
+          error: {
+            message: 'Failed to transcribe audio file.',
+            statusCode: 500,
+            code: 'TRANSCRIPTION_FAILURE',
+          },
+        });
+        return;
+      }
+
+      // Re-throw for global error handler
+      throw error;
+    }
   })
 );
 
