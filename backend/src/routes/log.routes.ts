@@ -24,12 +24,14 @@ const upload = multer({
     const allowedMimeTypes = [
       'audio/webm',
       'audio/wav',
+      'audio/x-wav',
       'audio/mp3',
       'audio/mpeg',
       'audio/ogg',
       'audio/flac',
       'audio/m4a',
       'audio/x-m4a',
+      'audio/mp4',
     ];
 
     if (allowedMimeTypes.includes(file.mimetype)) {
@@ -43,7 +45,11 @@ const upload = multer({
 /**
  * @route   POST /api/log
  * @desc    Upload audio file for transcription and logging
+ *          1. Uploads audio to Cloudinary (if configured)
+ *          2. Calls OnDemand Media API for transcription
+ *          3. Saves transcript to AudioLog model
  * @access  Private
+ * @body    multipart/form-data with 'audio' field
  */
 router.post(
   '/',
@@ -61,7 +67,7 @@ router.post(
     if (!req.file) {
       res.status(400).json({
         success: false,
-        error: { message: 'No audio file provided', statusCode: 400 },
+        error: { message: 'No audio file provided. Use multipart/form-data with "audio" field.', statusCode: 400 },
       });
       return;
     }
@@ -72,7 +78,10 @@ router.post(
       mimetype: req.file.mimetype,
     });
 
-    // Process the audio upload
+    // Process the audio upload:
+    // 1. Upload to Cloudinary
+    // 2. Transcribe via OnDemand Media API
+    // 3. Save to AudioLog
     const result = await audioService.processAudioUpload(
       req.user.id,
       req.file.buffer,
@@ -91,6 +100,7 @@ router.post(
           id: result.audioLog._id.toString(),
           transcript: result.transcript,
           duration: result.duration,
+          audioUrl: result.audioUrl,
           timestamp: result.audioLog.timestamp,
         },
         'Audio log created successfully'
@@ -103,6 +113,7 @@ router.post(
  * @route   GET /api/log
  * @desc    Get audio logs for the current user
  * @access  Private
+ * @query   page, limit, startDate, endDate, category
  */
 router.get(
   '/',
@@ -120,9 +131,9 @@ router.get(
     const skip = (page - 1) * limit;
 
     // Parse optional filters
-    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
-    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
-    const category = req.query.category as string | undefined;
+    const startDate = req.query['startDate'] ? new Date(req.query['startDate'] as string) : undefined;
+    const endDate = req.query['endDate'] ? new Date(req.query['endDate'] as string) : undefined;
+    const category = req.query['category'] as string | undefined;
 
     const { logs, total } = await audioService.getAudioLogs(req.user.id, {
       limit,
@@ -162,11 +173,7 @@ router.get(
       return;
     }
 
-    const { logs } = await audioService.getAudioLogs(req.user.id, {
-      limit: 1,
-    });
-
-    const log = logs.find((l) => l._id.toString() === logId);
+    const log = await audioService.getAudioLog(logId, req.user.id);
 
     if (!log) {
       res.status(404).json({
@@ -182,7 +189,7 @@ router.get(
 
 /**
  * @route   DELETE /api/log/:id
- * @desc    Delete an audio log
+ * @desc    Delete an audio log (also removes from Cloudinary if stored there)
  * @access  Private
  */
 router.delete(

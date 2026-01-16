@@ -3,25 +3,16 @@ import { AuthenticatedRequest } from '../types/express';
 import { authenticate } from '../middleware/auth.middleware';
 import { asyncHandler, ValidationError } from '../middleware/error.middleware';
 import { successResponse, paginatedResponse, parsePagination } from '../utils/response';
-import { aiService } from '../services/ai.service';
-import { ChatMessage } from '../models/ChatMessage';
+import { chatService, generateSessionId } from '../services/chat.service';
 import { logger } from '../utils/logger';
-import mongoose from 'mongoose';
-import crypto from 'crypto';
 
 const router = Router();
 
 /**
- * Generate a unique session ID
- */
-const generateSessionId = (): string => {
-  return `session_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`;
-};
-
-/**
  * @route   POST /api/chat
- * @desc    Send a chat message and receive AI response
+ * @desc    Send a chat message and receive AI response via OnDemand Chat API
  * @access  Private
+ * @body    { sessionId?: string, message: string }
  */
 router.post(
   '/',
@@ -49,13 +40,16 @@ router.post(
       throw new ValidationError('Message exceeds maximum length of 10,000 characters');
     }
 
-    // Use provided session ID or generate a new one
-    const chatSessionId = sessionId || generateSessionId();
+    // Use provided session ID or create a new one
+    let chatSessionId = sessionId;
+    if (!chatSessionId) {
+      chatSessionId = await chatService.createSession(req.user.id);
+    }
 
     logger.debug(`Chat message received from user ${req.user.id}, session ${chatSessionId}`);
 
-    // Process the chat message
-    const response = await aiService.processChat(
+    // Process the chat message via OnDemand API
+    const response = await chatService.sendMessage(
       req.user.id,
       chatSessionId,
       message.trim()
@@ -66,9 +60,39 @@ router.post(
         {
           sessionId: response.sessionId,
           message: response.message,
+          messageId: response.messageId,
           tokens: response.tokens,
+          model: response.model,
         },
         'Chat response generated'
+      )
+    );
+  })
+);
+
+/**
+ * @route   POST /api/chat/sessions
+ * @desc    Create a new chat session
+ * @access  Private
+ */
+router.post(
+  '/sessions',
+  authenticate,
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'User not authenticated', statusCode: 401 },
+      });
+      return;
+    }
+
+    const sessionId = await chatService.createSession(req.user.id);
+
+    res.status(201).json(
+      successResponse(
+        { sessionId },
+        'Chat session created'
       )
     );
   })
@@ -91,35 +115,9 @@ router.get(
       return;
     }
 
-    const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+    const limit = Math.min(parseInt(req.query['limit'] as string) || 10, 50);
 
-    const sessionIds = await ChatMessage.getUserSessions(
-      new mongoose.Types.ObjectId(req.user.id),
-      limit
-    );
-
-    // Get first and last message info for each session
-    const sessions = await Promise.all(
-      sessionIds.map(async (sessionId) => {
-        const messages = await ChatMessage.find({ sessionId })
-          .sort({ timestamp: 1 })
-          .limit(1)
-          .exec();
-
-        const lastMessage = await ChatMessage.findOne({ sessionId })
-          .sort({ timestamp: -1 })
-          .exec();
-
-        const messageCount = await ChatMessage.countDocuments({ sessionId });
-
-        return {
-          sessionId,
-          firstMessage: messages[0]?.content?.substring(0, 100) || '',
-          lastMessageAt: lastMessage?.timestamp,
-          messageCount,
-        };
-      })
-    );
+    const sessions = await chatService.getUserSessions(req.user.id, limit);
 
     res.json(successResponse(sessions));
   })
@@ -142,16 +140,25 @@ router.get(
       return;
     }
 
-    const { sessionId } = req.params;
+    const sessionId = req.params['sessionId'];
+    if (!sessionId) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Session ID is required', statusCode: 400 },
+      });
+      return;
+    }
+
     const { page, limit } = parsePagination(req.query as { page?: string; limit?: string });
 
-    // Verify session belongs to user
-    const sessionCheck = await ChatMessage.findOne({
-      sessionId,
-      userId: new mongoose.Types.ObjectId(req.user.id),
-    });
+    const messages = await chatService.getSessionHistory(sessionId, limit);
 
-    if (!sessionCheck) {
+    // Filter messages to only include user's messages (security check)
+    const userMessages = messages.filter(
+      (msg) => msg.userId.toString() === req.user?.id
+    );
+
+    if (userMessages.length === 0 && messages.length > 0) {
       res.status(404).json({
         success: false,
         error: { message: 'Chat session not found', statusCode: 404 },
@@ -159,24 +166,7 @@ router.get(
       return;
     }
 
-    const skip = (page - 1) * limit;
-
-    const [messages, total] = await Promise.all([
-      ChatMessage.find({
-        sessionId,
-        userId: new mongoose.Types.ObjectId(req.user.id),
-      })
-        .sort({ timestamp: 1 })
-        .skip(skip)
-        .limit(limit)
-        .exec(),
-      ChatMessage.countDocuments({
-        sessionId,
-        userId: new mongoose.Types.ObjectId(req.user.id),
-      }),
-    ]);
-
-    res.json(paginatedResponse(messages, total, page, limit));
+    res.json(paginatedResponse(userMessages, userMessages.length, page, limit));
   })
 );
 
@@ -197,14 +187,18 @@ router.delete(
       return;
     }
 
-    const { sessionId } = req.params;
+    const sessionId = req.params['sessionId'];
+    if (!sessionId) {
+      res.status(400).json({
+        success: false,
+        error: { message: 'Session ID is required', statusCode: 400 },
+      });
+      return;
+    }
 
-    const result = await ChatMessage.deleteMany({
-      sessionId,
-      userId: new mongoose.Types.ObjectId(req.user.id),
-    });
+    const deletedCount = await chatService.deleteSession(sessionId, req.user.id);
 
-    if (result.deletedCount === 0) {
+    if (deletedCount === 0) {
       res.status(404).json({
         success: false,
         error: { message: 'Chat session not found', statusCode: 404 },
@@ -212,11 +206,11 @@ router.delete(
       return;
     }
 
-    logger.info(`Chat session ${sessionId} deleted, ${result.deletedCount} messages removed`);
+    logger.info(`Chat session ${sessionId} deleted, ${deletedCount} messages removed`);
 
     res.json(
       successResponse(
-        { deletedCount: result.deletedCount },
+        { deletedCount },
         'Chat session deleted successfully'
       )
     );
