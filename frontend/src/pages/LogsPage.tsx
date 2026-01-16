@@ -2,83 +2,193 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    Loader2,
-    Play,
-    Pause,
-    Trash2,
-    Calendar,
-    Clock,
-    MessageSquare,
-    RefreshCw,
-    ChevronLeft,
-    ChevronRight
+  Play, Pause, Trash2, Calendar, Clock,
+  MessageSquare, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle
 } from 'lucide-react';
 import { getAudioLogs, deleteAudioLog } from '../lib/api';
+import { useTheme } from '../context/ThemeContext';
 
 interface AudioLog {
-    id: string;
-    transcript: string;
-    timestamp: string;
-    duration?: number;
-    audioUrl?: string;
-    category?: string;
-    sentiment?: string;
+  id: string;
+  transcript: string;
+  title?: string;
+  timestamp: string;
+  duration?: number;
+  audioUrl?: string;
+  category?: string;
+  sentiment?: string;
 }
 
 interface PaginationInfo {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
 const categoryEmojis: Record<string, string> = {
-    health: '💪',
-    work: '💼',
-    personal: '🏠',
-    family: '👨‍👩‍👧',
-    social: '👥',
-    finance: '💰',
-    learning: '📚',
-    other: '📝',
-    uncategorized: '📋',
+  health: '💪', work: '💼', personal: '🏠', family: '👨‍👩‍👧',
+  social: '👥', finance: '💰', learning: '📚', other: '📝', uncategorized: '📋',
 };
 
 const sentimentColors: Record<string, string> = {
-    positive: 'text-green-400',
-    negative: 'text-red-400',
-    neutral: 'text-gray-400',
-    mixed: 'text-yellow-400',
+  positive: 'text-emerald-400', negative: 'text-red-400',
+  neutral: 'text-gray-400', mixed: 'text-amber-400',
 };
 
-export default function LogsPage() {
-    const { getAccessTokenSilently } = useAuth0();
-    const [logs, setLogs] = useState<AudioLog[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [pagination, setPagination] = useState<PaginationInfo>({
-        page: 1,
-        limit: 10,
-        total: 0,
-        totalPages: 0,
-    });
-    const [playingId, setPlayingId] = useState<string | null>(null);
-    const [deletingId, setDeletingId] = useState<string | null>(null);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+// Theme-aware Preloader Component
+function ThemePreloader({ isDark }: { isDark: boolean }) {
+  // Generate particles on each render to ensure they're theme-aware
+  const starParticles = [...Array(8)].map((_, i) => ({
+    id: i,
+    angle: i * 45,
+  }));
+  
+  const dustParticles = [...Array(12)].map((_, i) => ({
+    id: i,
+    size: 3 + Math.random() * 4,
+    opacity: 0.3 + Math.random() * 0.3,
+    xOffset: (Math.random() - 0.5) * 100,
+    yOffset: (Math.random() - 0.5) * 100,
+    delay: i * 0.15,
+    duration: 2 + Math.random(),
+  }));
 
-    const fetchLogs = async (page: number = 1) => {
-        setLoading(true);
-        setError(null);
+  return (
+    <div 
+      className="min-h-screen flex items-center justify-center transition-colors duration-500" 
+      style={{ background: isDark ? '#000000' : '#F5E6D3' }}
+    >
+      <div className="relative flex flex-col items-center">
+        {/* Animated rings */}
+        <div className="relative w-24 h-24">
+          {/* Outer ring */}
+          <motion.div
+            className="absolute inset-0 rounded-full"
+            style={{
+              border: `3px solid ${isDark ? 'rgba(0, 212, 255, 0.1)' : 'rgba(139, 105, 20, 0.15)'}`,
+            }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+          />
+          
+          {/* Middle ring with gradient */}
+          <motion.div
+            className="absolute inset-2 rounded-full"
+            style={{
+              border: `3px solid transparent`,
+              borderTopColor: isDark ? '#00d4ff' : '#8B6914',
+              borderRightColor: isDark ? 'rgba(0, 212, 255, 0.5)' : 'rgba(139, 105, 20, 0.5)',
+            }}
+            animate={{ rotate: -360 }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+          />
+          
+          {/* Inner pulsing circle */}
+          <motion.div
+            className="absolute inset-4 rounded-full"
+            style={{
+              background: isDark 
+                ? 'radial-gradient(circle, rgba(0, 212, 255, 0.2) 0%, transparent 70%)'
+                : 'radial-gradient(circle, rgba(139, 105, 20, 0.25) 0%, transparent 70%)',
+            }}
+            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          
+          {/* Center dot */}
+          <motion.div
+            className="absolute rounded-full"
+            style={{
+              top: '50%',
+              left: '50%',
+              width: 12,
+              height: 12,
+              marginTop: -6,
+              marginLeft: -6,
+              background: isDark ? '#00d4ff' : '#8B6914',
+              boxShadow: isDark 
+                ? '0 0 20px rgba(0, 212, 255, 0.6)'
+                : '0 0 20px rgba(139, 105, 20, 0.6)',
+            }}
+            animate={{ scale: [1, 1.3, 1] }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        </div>
 
-        try {
-            const token = await getAccessTokenSilently({
-                authorizationParams: {
-                    audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-                }
-            });
+        {/* Floating particles around loader - THEME SPECIFIC */}
+        {isDark ? (
+          // Dark mode: Cyan star particles
+          starParticles.map((particle) => (
+            <motion.div
+              key={`star-${particle.id}`}
+              className="absolute w-1.5 h-1.5 rounded-full"
+              style={{
+                background: '#00d4ff',
+                boxShadow: '0 0 6px rgba(0, 212, 255, 0.8)',
+                top: '50%',
+                left: '50%',
+              }}
+              animate={{
+                x: [0, Math.cos(particle.angle * Math.PI / 180) * 60],
+                y: [0, Math.sin(particle.angle * Math.PI / 180) * 60],
+                opacity: [0, 1, 0],
+                scale: [0, 1, 0],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                delay: particle.id * 0.2,
+                ease: 'easeOut',
+              }}
+            />
+          ))
+        ) : (
+          // Light mode: Brown dust particles
+          dustParticles.map((particle) => (
+            <motion.div
+              key={`dust-${particle.id}`}
+              className="absolute rounded-full"
+              style={{
+                width: particle.size,
+                height: particle.size,
+                background: `rgba(139, 90, 43, ${particle.opacity})`,
+                boxShadow: '0 0 4px rgba(139, 90, 43, 0.3)',
+                top: '50%',
+                left: '50%',
+              }}
+              animate={{
+                x: [0, particle.xOffset],
+                y: [0, particle.yOffset],
+                opacity: [0, 0.7, 0],
+              }}
+              transition={{
+                duration: particle.duration,
+                repeat: Infinity,
+                delay: particle.delay,
+                ease: 'easeOut',
+              }}
+            />
+          ))
+        )}
 
-            const response = await getAudioLogs(token, { page, limit: 10 });
-            const data = response.data;
+        {/* Loading text */}
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-8 text-sm"
+          style={{ 
+            fontFamily: "'Inter', sans-serif", 
+            color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(61, 41, 20, 0.7)' 
+          }}
+        >
+          Loading your reflections...
+        </motion.p>
+      </div>
+    </div>
+  );
+}
 
             setLogs(data.data || []);
             setPagination({
@@ -179,150 +289,495 @@ export default function LogsPage() {
                 className="hidden"
             />
 
-            {/* Header */}
-            <header className="bg-gray-800/50 border-b border-gray-700 px-6 py-4">
-                <div className="max-w-4xl mx-auto flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-semibold">My Logs</h1>
-                        <p className="text-gray-400 text-sm">
-                            {pagination.total} total {pagination.total === 1 ? 'log' : 'logs'}
-                        </p>
-                    </div>
-                    <button
-                        onClick={() => fetchLogs(pagination.page)}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors disabled:opacity-50"
-                    >
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                        <span className="hidden sm:inline">Refresh</span>
-                    </button>
-                </div>
-            </header>
+            {/* Icon */}
+            <div className="text-center mb-5">
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: 'spring', damping: 15, delay: 0.1 }}
+                className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
+                style={{
+                  background: isDark 
+                    ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(180, 50, 50, 0.3) 100%)'
+                    : 'linear-gradient(135deg, rgba(220, 100, 80, 0.2) 0%, rgba(180, 80, 60, 0.25) 100%)',
+                  border: isDark ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(180, 80, 60, 0.3)',
+                }}
+              >
+                <motion.div
+                  animate={{ rotate: [0, -10, 10, -10, 0] }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                >
+                  <AlertTriangle 
+                    className="w-8 h-8" 
+                    style={{ color: isDark ? '#f87171' : '#B85450' }} 
+                  />
+                </motion.div>
+              </motion.div>
+            </div>
 
-            <main className="max-w-4xl mx-auto px-4 py-8">
-                {error && (
-                    <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 mb-6 text-red-300">
-                        {error}
-                    </div>
-                )}
+            {/* Content */}
+            <div className="text-center mb-6">
+              <h3 
+                className="text-lg font-semibold mb-2"
+                style={{ 
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: isDark ? '#ffffff' : '#3D2914',
+                }}
+              >
+                Delete Recording?
+              </h3>
+              <p 
+                className="text-sm"
+                style={{ 
+                  fontFamily: "'Inter', sans-serif",
+                  color: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(61, 41, 20, 0.6)',
+                }}
+              >
+                {logTitle ? `"${logTitle}"` : 'This recording'} will be permanently deleted.
+              </p>
+            </div>
 
-                {logs.length === 0 ? (
-                    <div className="text-center py-16">
-                        <MessageSquare className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-                        <h2 className="text-xl font-semibold text-gray-400 mb-2">No logs yet</h2>
-                        <p className="text-gray-500">Start recording your daily reflections!</p>
-                    </div>
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <motion.button
+                onClick={onClose}
+                disabled={isDeleting}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="flex-1 py-3 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                  border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(0, 0, 0, 0.1)',
+                  color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(61, 41, 20, 0.7)',
+                }}
+              >
+                Cancel
+              </motion.button>
+              <motion.button
+                onClick={onConfirm}
+                disabled={isDeleting}
+                whileHover={{ scale: isDeleting ? 1 : 1.02 }}
+                whileTap={{ scale: isDeleting ? 1 : 0.98 }}
+                className="flex-1 py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                style={{
+                  fontFamily: "'Inter', sans-serif",
+                  background: isDark 
+                    ? 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
+                    : 'linear-gradient(135deg, #B85450 0%, #9A4540 100%)',
+                  color: '#ffffff',
+                  boxShadow: isDark 
+                    ? '0 0 20px rgba(239, 68, 68, 0.3)'
+                    : '0 0 20px rgba(180, 80, 60, 0.3)',
+                }}
+              >
+                {isDeleting ? (
+                  <>
+                    <motion.div
+                      className="w-4 h-4 rounded-full border-2 border-white border-t-transparent"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    />
+                    Deleting...
+                  </>
                 ) : (
-                    <AnimatePresence>
-                        <div className="space-y-4">
-                            {logs.map((log, index) => (
-                                <motion.div
-                                    key={log.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -20 }}
-                                    transition={{ delay: index * 0.05 }}
-                                    className="bg-gray-800 border border-gray-700 rounded-xl p-5 hover:border-gray-600 transition-colors"
-                                >
-                                    {/* Log Header */}
-                                    <div className="flex items-start justify-between gap-4 mb-3">
-                                        <div className="flex items-center gap-3 text-sm text-gray-400">
-                                            <span className="flex items-center gap-1">
-                                                <Calendar className="w-4 h-4" />
-                                                {formatDate(log.timestamp)}
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Clock className="w-4 h-4" />
-                                                {formatDuration(log.duration)}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            {log.category && (
-                                                <span className="px-2 py-1 text-xs rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                                                    {categoryEmojis[log.category] || '📝'} {log.category}
-                                                </span>
-                                            )}
-                                            {log.sentiment && (
-                                                <span className={`text-xs ${sentimentColors[log.sentiment] || 'text-gray-400'}`}>
-                                                    {log.sentiment}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Transcript */}
-                                    <p className="text-gray-300 mb-4 leading-relaxed">
-                                        {log.transcript}
-                                    </p>
-
-                                    {/* Actions */}
-                                    <div className="flex items-center gap-3">
-                                        {log.audioUrl && (
-                                            <button
-                                                onClick={() => handlePlayPause(log)}
-                                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors text-sm"
-                                            >
-                                                {playingId === log.id ? (
-                                                    <>
-                                                        <Pause className="w-4 h-4" />
-                                                        Pause
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Play className="w-4 h-4" />
-                                                        Play
-                                                    </>
-                                                )}
-                                            </button>
-                                        )}
-
-                                        <button
-                                            onClick={() => handleDelete(log.id)}
-                                            disabled={deletingId === log.id}
-                                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors text-sm disabled:opacity-50"
-                                        >
-                                            {deletingId === log.id ? (
-                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                            ) : (
-                                                <Trash2 className="w-4 h-4" />
-                                            )}
-                                            Delete
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </AnimatePresence>
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </>
                 )}
+              </motion.button>
+            </div>
 
-                {/* Pagination */}
-                {pagination.totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-4 mt-8">
-                        <button
-                            onClick={() => fetchLogs(pagination.page - 1)}
-                            disabled={pagination.page <= 1 || loading}
-                            className="flex items-center gap-1 px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                            Previous
-                        </button>
+            {/* Animated particles on delete */}
+            {isDeleting && (
+              <>
+                {[...Array(8)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-2 h-2 rounded-full"
+                    style={{
+                      background: isDark ? '#f87171' : '#B85450',
+                      top: '30%',
+                      left: '50%',
+                    }}
+                    initial={{ opacity: 1, scale: 1 }}
+                    animate={{
+                      x: Math.cos(i * 45 * Math.PI / 180) * 80,
+                      y: Math.sin(i * 45 * Math.PI / 180) * 80,
+                      opacity: 0,
+                      scale: 0,
+                    }}
+                    transition={{
+                      duration: 0.8,
+                      repeat: Infinity,
+                      delay: i * 0.1,
+                      ease: 'easeOut',
+                    }}
+                  />
+                ))}
+              </>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
-                        <span className="text-gray-400">
-                            Page {pagination.page} of {pagination.totalPages}
-                        </span>
+export default function LogsPage() {
+  const { getAccessTokenSilently } = useAuth0();
+  const { isDark, isLoaded: themeLoaded } = useTheme();
+  const [logs, setLogs] = useState<AudioLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<PaginationInfo>({ page: 1, limit: 10, total: 0, totalPages: 0 });
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [logToDelete, setLogToDelete] = useState<AudioLog | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-                        <button
-                            onClick={() => fetchLogs(pagination.page + 1)}
-                            disabled={pagination.page >= pagination.totalPages || loading}
-                            className="flex items-center gap-1 px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Next
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                )}
-            </main>
+  const fetchLogs = async (page: number = 1) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await getAccessTokenSilently({
+        authorizationParams: { audience: import.meta.env.VITE_AUTH0_AUDIENCE }
+      });
+      const response = await getAudioLogs(token, { page, limit: 10 });
+      setLogs(response.data.data || []);
+      setPagination({
+        page: response.data.pagination?.page || 1,
+        limit: response.data.pagination?.limit || 10,
+        total: response.data.pagination?.total || 0,
+        totalPages: response.data.pagination?.totalPages || 0,
+      });
+    } catch (err) {
+      console.error('Error fetching logs:', err);
+      setError('Failed to load logs.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchLogs(); }, []);
+
+  const handlePlayPause = (log: AudioLog) => {
+    if (!log.audioUrl) return;
+    if (playingId === log.id) {
+      audioRef.current?.pause();
+      setPlayingId(null);
+    } else {
+      if (audioRef.current) {
+        audioRef.current.src = log.audioUrl;
+        audioRef.current.play();
+        setPlayingId(log.id);
+      }
+    }
+  };
+
+  const openDeleteModal = (log: AudioLog) => {
+    setLogToDelete(log);
+    setDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    if (!deletingId) {
+      setDeleteModalOpen(false);
+      setLogToDelete(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!logToDelete) return;
+    setDeletingId(logToDelete.id);
+    try {
+      const token = await getAccessTokenSilently({
+        authorizationParams: { audience: import.meta.env.VITE_AUTH0_AUDIENCE }
+      });
+      await deleteAudioLog(token, logToDelete.id);
+      setLogs(logs.filter(log => log.id !== logToDelete.id));
+      setPagination(prev => ({ ...prev, total: prev.total - 1 }));
+      setDeleteModalOpen(false);
+      setLogToDelete(null);
+    } catch (err) {
+      console.error('Error deleting log:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return '--';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  if (!themeLoaded || (loading && logs.length === 0)) {
+    return <ThemePreloader key={isDark ? 'dark' : 'light'} isDark={isDark} />;
+  }
+
+  return (
+    <div className="min-h-screen pb-12 transition-colors duration-500" style={{ background: isDark ? '#000000' : '#F5E6D3', color: isDark ? '#ffffff' : '#3D2914' }}>
+      <audio ref={audioRef} onEnded={() => setPlayingId(null)} className="hidden" />
+
+      {/* Header */}
+      <header 
+        className="sticky top-16 z-30 px-4 py-4"
+        style={{
+          background: isDark ? 'rgba(0,0,0,0.8)' : 'rgba(245, 230, 211, 0.9)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+        }}
+      >
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 
+              className="text-xl font-semibold"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                ...(isDark ? {
+                  background: 'linear-gradient(135deg, #ffffff 0%, #80e0ff 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                } : {
+                  color: '#3D2914',
+                }),
+              }}
+            >
+              My Logs
+            </h1>
+            <p style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(61, 41, 20, 0.6)', fontSize: '0.875rem' }}>
+              {pagination.total} total {pagination.total === 1 ? 'log' : 'logs'}
+            </p>
+          </div>
+          <motion.button
+            onClick={() => fetchLogs(pagination.page)}
+            disabled={loading}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)',
+              border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+              fontFamily: "'Inter', sans-serif",
+              color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(61, 41, 20, 0.7)',
+            }}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline text-sm">Refresh</span>
+          </motion.button>
         </div>
-    );
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {error && (
+          <div 
+            className="rounded-xl p-4 mb-6"
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              color: '#f87171',
+              fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {logs.length === 0 ? (
+          <div className="text-center py-20">
+            <MessageSquare className="w-16 h-16 mx-auto mb-4" style={{ color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(61, 41, 20, 0.2)' }} />
+            <h2 
+              className="text-xl font-semibold mb-2"
+              style={{ fontFamily: "'Space Grotesk', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(61, 41, 20, 0.7)' }}
+            >
+              No logs yet
+            </h2>
+            <p style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(61, 41, 20, 0.5)' }}>
+              Start recording your daily reflections!
+            </p>
+          </div>
+        ) : (
+          <AnimatePresence>
+            <div className="space-y-4">
+              {logs.map((log, index) => (
+                <motion.div
+                  key={log.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ delay: index * 0.05, duration: 0.5 }}
+                  className="group rounded-2xl p-5 transition-all duration-300"
+                  style={{
+                    background: isDark 
+                      ? 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%)'
+                      : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%)',
+                    border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+                  }}
+                >
+                  {/* Title */}
+                  {log.title && (
+                    <h3 
+                      className="text-lg font-semibold mb-3"
+                      style={{ 
+                        fontFamily: "'Space Grotesk', sans-serif", 
+                        color: isDark ? '#ffffff' : '#3D2914' 
+                      }}
+                    >
+                      {log.title}
+                    </h3>
+                  )}
+
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-4 text-sm" style={{ color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(61, 41, 20, 0.6)' }}>
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-4 h-4" />
+                        {formatDate(log.timestamp)}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-4 h-4" />
+                        {formatDuration(log.duration)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {log.category && (
+                        <span 
+                          className="px-2.5 py-1 text-xs rounded-lg"
+                          style={{
+                            background: isDark ? 'rgba(0, 212, 255, 0.1)' : 'rgba(139, 105, 20, 0.1)',
+                            border: isDark ? '1px solid rgba(0, 212, 255, 0.2)' : '1px solid rgba(139, 105, 20, 0.2)',
+                            color: isDark ? '#00d4ff' : '#8B6914',
+                            fontFamily: "'Inter', sans-serif",
+                          }}
+                        >
+                          {categoryEmojis[log.category] || '📝'} {log.category}
+                        </span>
+                      )}
+                      {log.sentiment && (
+                        <span className={`text-xs capitalize ${sentimentColors[log.sentiment]}`}>
+                          {log.sentiment}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Transcript */}
+                  <p 
+                    className="mb-5 leading-relaxed"
+                    style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(61, 41, 20, 0.8)' }}
+                  >
+                    {log.transcript}
+                  </p>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3">
+                    {log.audioUrl && (
+                      <motion.button
+                        onClick={() => handlePlayPause(log)}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all"
+                        style={{
+                          background: playingId === log.id 
+                            ? (isDark ? 'rgba(0, 212, 255, 0.15)' : 'rgba(139, 105, 20, 0.15)')
+                            : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)'),
+                          border: `1px solid ${playingId === log.id 
+                            ? (isDark ? 'rgba(0, 212, 255, 0.3)' : 'rgba(139, 105, 20, 0.3)')
+                            : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)')}`,
+                          color: playingId === log.id 
+                            ? (isDark ? '#00d4ff' : '#8B6914')
+                            : (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(61, 41, 20, 0.7)'),
+                          fontFamily: "'Inter', sans-serif",
+                        }}
+                      >
+                        {playingId === log.id ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                        {playingId === log.id ? 'Pause' : 'Play'}
+                      </motion.button>
+                    )}
+                    <motion.button
+                      onClick={() => openDeleteModal(log)}
+                      disabled={deletingId === log.id}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all disabled:opacity-50"
+                      style={{
+                        background: isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(180, 80, 60, 0.1)',
+                        border: isDark ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid rgba(180, 80, 60, 0.2)',
+                        color: isDark ? '#f87171' : '#B85450',
+                        fontFamily: "'Inter', sans-serif",
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </motion.button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </AnimatePresence>
+        )}
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 mt-10">
+            <motion.button
+              onClick={() => fetchLogs(pagination.page - 1)}
+              disabled={pagination.page <= 1 || loading}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm disabled:opacity-30"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+                color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(61, 41, 20, 0.7)',
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Previous
+            </motion.button>
+            <span style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(61, 41, 20, 0.6)' }}>
+              Page {pagination.page} of {pagination.totalPages}
+            </span>
+            <motion.button
+              onClick={() => fetchLogs(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages || loading}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm disabled:opacity-30"
+              style={{
+                background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)',
+                border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+                color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(61, 41, 20, 0.7)',
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </motion.button>
+          </div>
+        )}
+      </main>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteModal
+        isOpen={deleteModalOpen}
+        onClose={closeDeleteModal}
+        onConfirm={handleDelete}
+        isDeleting={!!deletingId}
+        isDark={isDark}
+        logTitle={logToDelete?.title}
+      />
+    </div>
+  );
 }

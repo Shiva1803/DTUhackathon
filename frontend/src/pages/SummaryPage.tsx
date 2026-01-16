@@ -7,19 +7,14 @@ import PhaseBadge from '../components/PhaseBadge';
 import ShareCard from '../components/ShareCard';
 import StreakCelebration from '../components/StreakCelebration';
 import { AxiosError } from 'axios';
+import { useTheme } from '../context/ThemeContext';
 
 interface SummaryMetrics {
   totalLogs: number;
   categoryCounts: Record<string, number>;
-  sentimentBreakdown: {
-    positive: number;
-    negative: number;
-    neutral: number;
-    mixed: number;
-  };
+  sentimentBreakdown: { positive: number; negative: number; neutral: number; mixed: number };
   averageDuration?: number;
   topKeywords?: string[];
-  totalDuration?: number;
 }
 
 interface SummaryData {
@@ -34,28 +29,9 @@ interface SummaryData {
   isComplete: boolean;
   phase: string;
   phaseConfidence: number;
-  streak?: {
-    current: number;
-    longest: number;
-  };
+  streak?: { current: number; longest: number };
 }
 
-const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.15 }
-  }
-};
-
-/**
- * ISO 8601 week number calculation
- */
 function getISOWeekNumber(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -71,18 +47,10 @@ function getISOWeekYear(date: Date): number {
   return d.getUTCFullYear();
 }
 
-/**
- * Helper to get week ID in format "YYYY-Wnn"
- */
 function getWeekId(date: Date = new Date()): string {
-  const year = getISOWeekYear(date);
-  const week = getISOWeekNumber(date);
-  return `${year}-W${week.toString().padStart(2, '0')}`;
+  return `${getISOWeekYear(date)}-W${getISOWeekNumber(date).toString().padStart(2, '0')}`;
 }
 
-/**
- * Helper to get start of week (Monday)
- */
 function getWeekStart(): string {
   const now = new Date();
   const year = getISOWeekYear(now);
@@ -91,28 +59,19 @@ function getWeekStart(): string {
   const dayOfWeek = jan4.getUTCDay() || 7;
   const mondayOfWeek1 = new Date(jan4);
   mondayOfWeek1.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1);
-
   const targetMonday = new Date(mondayOfWeek1);
   targetMonday.setUTCDate(mondayOfWeek1.getUTCDate() + (week - 1) * 7);
-  targetMonday.setUTCHours(0, 0, 0, 0);
-
   return targetMonday.toISOString();
 }
 
 const categoryEmojis: Record<string, string> = {
-  health: '💪',
-  work: '💼',
-  personal: '🏠',
-  family: '👨‍👩‍👧',
-  social: '👥',
-  finance: '💰',
-  learning: '📚',
-  other: '📝',
-  uncategorized: '📋',
+  health: '💪', work: '💼', personal: '🏠', family: '👨‍👩‍👧',
+  social: '👥', finance: '💰', learning: '📚', other: '📝', uncategorized: '📋',
 };
 
 export default function SummaryPage() {
   const { getAccessTokenSilently } = useAuth0();
+  const { isDark } = useTheme();
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -123,25 +82,17 @@ export default function SummaryPage() {
   const fetchSummary = async () => {
     setLoading(true);
     setError(null);
-
     try {
       const token = await getAccessTokenSilently({
-        authorizationParams: {
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-        }
+        authorizationParams: { audience: import.meta.env.VITE_AUTH0_AUDIENCE }
       });
-      const weekId = getWeekId();
-      const response = await getSummary(token, weekId);
-
-      // Handle the response structure
-      const data = response.data?.data || response.data;
-      setSummary(data);
+      const response = await getSummary(token, getWeekId());
+      setSummary(response.data?.data || response.data);
     } catch (err) {
-      console.error('Error fetching summary:', err);
       if (err instanceof AxiosError && err.response?.status === 404) {
-        setError('No summary available yet. Record some logs first, then generate a summary.');
+        setError('No summary available yet. Record some logs first.');
       } else {
-        setError('Unable to load summary. Please try again later.');
+        setError('Unable to load summary.');
       }
     } finally {
       setLoading(false);
@@ -152,18 +103,12 @@ export default function SummaryPage() {
     setGenerating(true);
     try {
       const token = await getAccessTokenSilently({
-        authorizationParams: {
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-        }
+        authorizationParams: { audience: import.meta.env.VITE_AUTH0_AUDIENCE }
       });
-      const weekStart = getWeekStart();
-      await generateSummary(token, weekStart);
-
-      // Refetch the summary
+      await generateSummary(token, getWeekStart());
       await fetchSummary();
-    } catch (err) {
-      console.error('Error generating summary:', err);
-      setError('Failed to generate summary. Make sure you have some logs recorded.');
+    } catch {
+      setError('Failed to generate summary.');
     } finally {
       setGenerating(false);
     }
@@ -176,21 +121,19 @@ export default function SummaryPage() {
 
   const handleAudioToggle = () => {
     if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
+    if (isPlaying) audioRef.current.pause();
+    else audioRef.current.play();
     setIsPlaying(!isPlaying);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center transition-colors duration-500" style={{ background: isDark ? '#000000' : '#F5E6D3' }}>
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 animate-spin text-purple-500" />
-          <span className="text-gray-400">Loading your summary...</span>
+          <Loader2 className="w-10 h-10 animate-spin" style={{ color: isDark ? '#00d4ff' : '#8B6914' }} />
+          <span style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(61, 41, 20, 0.6)' }}>
+            Loading summary...
+          </span>
         </div>
       </div>
     );
@@ -198,208 +141,321 @@ export default function SummaryPage() {
 
   if (error || !summary) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+      <div className="min-h-screen flex items-center justify-center px-6 transition-colors duration-500" style={{ background: isDark ? '#000000' : '#F5E6D3' }}>
         <div className="text-center max-w-md">
-          <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 text-lg mb-2">{error || 'No summary available yet.'}</p>
-          <p className="text-gray-500 text-sm mb-6">
-            Record daily logs and then generate your weekly summary.
+          <Calendar className="w-16 h-16 mx-auto mb-4" style={{ color: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(61,41,20,0.2)' }} />
+          <p className="text-lg mb-2" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(61, 41, 20, 0.6)' }}>
+            {error || 'No summary available yet.'}
           </p>
-          <button
+          <p className="text-sm mb-8" style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(61, 41, 20, 0.5)' }}>
+            Record daily logs and generate your weekly summary.
+          </p>
+          <motion.button
             onClick={handleGenerateSummary}
             disabled={generating}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-medium hover:from-purple-600 hover:to-cyan-600 transition-all disabled:opacity-50"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-medium disabled:opacity-50"
+            style={{
+              fontFamily: "'Inter', sans-serif",
+              background: isDark 
+                ? 'linear-gradient(135deg, #003040 0%, #006080 100%)'
+                : 'linear-gradient(135deg, #C2986C 0%, #D4A574 100%)',
+              border: isDark ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid rgba(139, 105, 20, 0.3)',
+              boxShadow: isDark ? '0 0 30px rgba(0, 212, 255, 0.2)' : '0 0 30px rgba(139, 105, 20, 0.2)',
+              color: '#ffffff',
+            }}
           >
-            {generating ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-5 h-5" />
-                Generate Summary
-              </>
-            )}
-          </button>
+            {generating ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+            {generating ? 'Generating...' : 'Generate Summary'}
+          </motion.button>
         </div>
       </div>
     );
   }
 
   const topCategories = Object.entries(summary.metrics.categoryCounts || {})
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4);
+    .sort((a, b) => b[1] - a[1]).slice(0, 4);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-12">
-      {/* Streak Celebration */}
-      {summary.streak && (
-        <StreakCelebration streak={summary.streak.current} />
-      )}
+    <div className="min-h-screen pb-12 transition-colors duration-500" style={{ background: isDark ? '#000000' : '#F5E6D3', color: isDark ? '#ffffff' : '#3D2914' }}>
+      {summary.streak && <StreakCelebration streak={summary.streak.current} />}
 
       {/* Header */}
-      <header className="bg-gray-800/50 border-b border-gray-700 px-6 py-4">
+      <header 
+        className="sticky top-16 z-30 px-4 py-4"
+        style={{
+          background: isDark ? 'rgba(0,0,0,0.8)' : 'rgba(245, 230, 211, 0.9)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+        }}
+      >
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold">Weekly Summary</h1>
-            <p className="text-gray-400 text-sm">{getWeekId()}</p>
+            <h1 
+              className="text-xl font-semibold"
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                ...(isDark ? {
+                  background: 'linear-gradient(135deg, #ffffff 0%, #80e0ff 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                } : {
+                  color: '#3D2914',
+                }),
+              }}
+            >
+              Weekly Summary
+            </h1>
+            <p style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(61, 41, 20, 0.6)', fontSize: '0.875rem' }}>
+              {getWeekId()}
+            </p>
           </div>
-          <button
+          <motion.button
             onClick={handleGenerateSummary}
             disabled={generating}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors disabled:opacity-50"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl disabled:opacity-50"
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)',
+              border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+              fontFamily: "'Inter', sans-serif",
+              color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(61, 41, 20, 0.7)',
+            }}
           >
-            {generating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4" />
-            )}
-            <span className="hidden sm:inline">Regenerate</span>
-          </button>
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            <span className="hidden sm:inline text-sm">Regenerate</span>
+          </motion.button>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-8 space-y-8">
+        {/* Phase Badge */}
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={staggerContainer}
-          className="space-y-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-center py-6"
         >
-          {/* Phase Badge */}
-          <motion.div variants={fadeInUp} className="flex justify-center py-6">
-            <PhaseBadge phase={summary.phase} confidence={summary.phaseConfidence} />
-          </motion.div>
+          <PhaseBadge phase={summary.phase} confidence={summary.phaseConfidence} />
+        </motion.div>
 
-          {/* Quick Stats */}
-          <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-purple-400">{summary.metrics.totalLogs}</p>
-              <p className="text-gray-400 text-sm">Total Logs</p>
-            </div>
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-green-400">{summary.metrics.sentimentBreakdown?.positive || 0}</p>
-              <p className="text-gray-400 text-sm">Positive</p>
-            </div>
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-cyan-400">
-                {summary.metrics.averageDuration ? Math.round(summary.metrics.averageDuration) : 0}s
-              </p>
-              <p className="text-gray-400 text-sm">Avg Duration</p>
-            </div>
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
-              <p className="text-3xl font-bold text-yellow-400">
-                {Object.keys(summary.metrics.categoryCounts || {}).length}
-              </p>
-              <p className="text-gray-400 text-sm">Categories</p>
-            </div>
-          </motion.div>
-
-          {/* Categories Breakdown */}
-          {topCategories.length > 0 && (
-            <motion.div
-              variants={fadeInUp}
-              className="bg-gray-800 border border-gray-700 rounded-xl p-6"
+        {/* Quick Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="grid grid-cols-2 md:grid-cols-4 gap-4"
+        >
+          {[
+            { value: summary.metrics.totalLogs, label: 'Total Logs', color: isDark ? '#00d4ff' : '#8B6914' },
+            { value: summary.metrics.sentimentBreakdown?.positive || 0, label: 'Positive', color: '#10b981' },
+            { value: summary.metrics.averageDuration ? `${Math.round(summary.metrics.averageDuration)}s` : '0s', label: 'Avg Duration', color: isDark ? '#00d4ff' : '#8B6914' },
+            { value: Object.keys(summary.metrics.categoryCounts || {}).length, label: 'Categories', color: '#f59e0b' },
+          ].map((stat, i) => (
+            <div
+              key={i}
+              className="rounded-2xl p-5 text-center"
+              style={{
+                background: isDark 
+                  ? 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%)'
+                  : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%)',
+                border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+              }}
             >
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-purple-400" />
-                Top Categories
-              </h2>
-              <div className="space-y-3">
-                {topCategories.map(([category, count]) => {
-                  const total = summary.metrics.totalLogs;
-                  const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-                  return (
-                    <div key={category} className="flex items-center gap-3">
-                      <span className="text-xl">{categoryEmojis[category] || '📝'}</span>
-                      <span className="capitalize text-gray-300 w-24">{category}</span>
-                      <div className="flex-1 h-2 bg-gray-700 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${percentage}%` }}
-                          transition={{ duration: 0.8, delay: 0.2 }}
-                          className="h-full bg-gradient-to-r from-purple-500 to-cyan-500"
-                        />
-                      </div>
-                      <span className="text-gray-400 text-sm w-12 text-right">{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
+              <p 
+                className="text-3xl font-semibold mb-1"
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: stat.color }}
+              >
+                {stat.value}
+              </p>
+              <p style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(61, 41, 20, 0.6)', fontSize: '0.875rem' }}>
+                {stat.label}
+              </p>
+            </div>
+          ))}
+        </motion.div>
 
-          {/* Keywords */}
-          {summary.metrics.topKeywords && summary.metrics.topKeywords.length > 0 && (
-            <motion.div variants={fadeInUp} className="flex flex-wrap gap-2 justify-center">
-              {summary.metrics.topKeywords.map((keyword) => (
-                <span
-                  key={keyword}
-                  className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-sm border border-purple-500/30"
-                >
-                  {keyword}
-                </span>
-              ))}
-            </motion.div>
-          )}
-
-          {/* Story Section */}
+        {/* Categories */}
+        {topCategories.length > 0 && (
           <motion.div
-            variants={fadeInUp}
-            className="bg-gray-800 border border-gray-700 rounded-xl p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="rounded-2xl p-6"
+            style={{
+              background: isDark 
+                ? 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%)'
+                : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%)',
+              border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+            }}
           >
-            <h2 className="text-xl font-semibold mb-4 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">
-              Your Week in Review
-            </h2>
-            <p className="text-gray-300 leading-relaxed whitespace-pre-line">{summary.story}</p>
-          </motion.div>
-
-          {/* Audio Player */}
-          {summary.ttsUrl && (
-            <motion.div
-              variants={fadeInUp}
-              className="bg-gray-800 border border-gray-700 rounded-xl p-6"
+            <h2 
+              className="text-lg font-semibold mb-5 flex items-center gap-2"
+              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleAudioToggle}
-                  className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 flex items-center justify-center hover:from-purple-600 hover:to-cyan-600 transition-all"
-                >
-                  {isPlaying ? (
-                    <Pause className="w-6 h-6" />
-                  ) : (
-                    <Play className="w-6 h-6 ml-1" />
-                  )}
-                </button>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Volume2 className="w-4 h-4 text-purple-400" />
-                    <span className="font-medium">Listen to your summary</span>
+              <TrendingUp className="w-5 h-5" style={{ color: isDark ? '#00d4ff' : '#8B6914' }} />
+              Top Categories
+            </h2>
+            <div className="space-y-4">
+              {topCategories.map(([category, count]) => {
+                const percentage = summary.metrics.totalLogs > 0 
+                  ? Math.round((count / summary.metrics.totalLogs) * 100) : 0;
+                return (
+                  <div key={category} className="flex items-center gap-3">
+                    <span className="text-xl w-8">{categoryEmojis[category] || '📝'}</span>
+                    <span 
+                      className="capitalize w-24"
+                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(61, 41, 20, 0.8)' }}
+                    >
+                      {category}
+                    </span>
+                    <div 
+                      className="flex-1 h-2 rounded-full overflow-hidden"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)' }}
+                    >
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentage}%` }}
+                        transition={{ duration: 1, delay: 0.3 }}
+                        className="h-full rounded-full"
+                        style={{ background: isDark ? 'linear-gradient(90deg, #003040, #00d4ff)' : 'linear-gradient(90deg, #C2986C, #8B6914)' }}
+                      />
+                    </div>
+                    <span 
+                      className="w-10 text-right text-sm"
+                      style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(61, 41, 20, 0.6)' }}
+                    >
+                      {count}
+                    </span>
                   </div>
-                  <p className="text-gray-400 text-sm">AI-generated voice recap</p>
-                </div>
-              </div>
-              <audio
-                ref={audioRef}
-                src={summary.ttsUrl}
-                onEnded={() => setIsPlaying(false)}
-                className="hidden"
-              />
-            </motion.div>
-          )}
-
-          {/* Share Card Integration */}
-          <motion.div variants={fadeInUp} className="flex justify-center pt-4">
-            <ShareCard
-              phase={summary.phase}
-              phaseConfidence={summary.phaseConfidence}
-              metrics={summary.metrics}
-              story={summary.story}
-              weekId={summary.weekId}
-              streak={summary.streak}
-            />
+                );
+              })}
+            </div>
           </motion.div>
+        )}
+
+        {/* Keywords */}
+        {summary.metrics.topKeywords?.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="flex flex-wrap gap-2 justify-center"
+          >
+            {summary.metrics.topKeywords.map((keyword) => (
+              <span
+                key={keyword}
+                className="px-3 py-1.5 rounded-lg text-sm"
+                style={{
+                  background: isDark ? 'rgba(0, 212, 255, 0.1)' : 'rgba(139, 105, 20, 0.1)',
+                  border: isDark ? '1px solid rgba(0, 212, 255, 0.2)' : '1px solid rgba(139, 105, 20, 0.2)',
+                  color: isDark ? '#00d4ff' : '#8B6914',
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                {keyword}
+              </span>
+            ))}
+          </motion.div>
+        )}
+
+        {/* Story */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="rounded-2xl p-6"
+          style={{
+            background: isDark 
+              ? 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%)'
+              : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%)',
+            border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+          }}
+        >
+          <h2 
+            className="text-xl font-semibold mb-4"
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              ...(isDark ? {
+                background: 'linear-gradient(135deg, #ffffff 0%, #80e0ff 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              } : {
+                color: '#3D2914',
+              }),
+            }}
+          >
+            Your Week in Review
+          </h2>
+          <p 
+            className="leading-relaxed whitespace-pre-line"
+            style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(61, 41, 20, 0.8)' }}
+          >
+            {summary.story}
+          </p>
+        </motion.div>
+
+        {/* Audio Player */}
+        {summary.ttsUrl && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="rounded-2xl p-6"
+            style={{
+              background: isDark 
+                ? 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.005) 100%)'
+                : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.6) 100%)',
+              border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+            }}
+          >
+            <div className="flex items-center gap-4">
+              <motion.button
+                onClick={handleAudioToggle}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-14 h-14 rounded-xl flex items-center justify-center text-white"
+                style={{
+                  background: isDark 
+                    ? 'linear-gradient(135deg, #003040 0%, #006080 100%)'
+                    : 'linear-gradient(135deg, #C2986C 0%, #D4A574 100%)',
+                  boxShadow: isDark ? '0 0 30px rgba(0, 212, 255, 0.2)' : '0 0 30px rgba(139, 105, 20, 0.2)',
+                }}
+              >
+                {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+              </motion.button>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Volume2 className="w-4 h-4" style={{ color: isDark ? '#00d4ff' : '#8B6914' }} />
+                  <span className="font-medium" style={{ fontFamily: "'Inter', sans-serif" }}>
+                    Listen to your summary
+                  </span>
+                </div>
+                <p style={{ fontFamily: "'Inter', sans-serif", color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(61, 41, 20, 0.6)', fontSize: '0.875rem' }}>
+                  AI-generated voice recap
+                </p>
+              </div>
+            </div>
+            <audio ref={audioRef} src={summary.ttsUrl} onEnded={() => setIsPlaying(false)} className="hidden" />
+          </motion.div>
+        )}
+
+        {/* Share Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="flex justify-center pt-4"
+        >
+          <ShareCard
+            phase={summary.phase}
+            phaseConfidence={summary.phaseConfidence}
+            metrics={summary.metrics}
+            story={summary.story}
+            weekId={summary.weekId}
+            streak={summary.streak}
+          />
         </motion.div>
       </main>
     </div>

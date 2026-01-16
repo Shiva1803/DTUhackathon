@@ -8,6 +8,7 @@ export interface IAudioLog extends Document {
   _id: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
   transcript: string;
+  title?: string;            // AI-generated title summarizing the log
   timestamp: Date;
   duration?: number;         // Audio duration in seconds
   audioUrl?: string;         // URL to stored audio file
@@ -32,6 +33,11 @@ const audioLogSchema = new Schema<IAudioLog>(
       required: [true, 'Transcript is required'],
       trim: true,
       minlength: [1, 'Transcript cannot be empty'],
+    },
+    title: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Title cannot exceed 100 characters'],
     },
     timestamp: {
       type: Date,

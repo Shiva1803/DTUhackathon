@@ -66,12 +66,14 @@ export class AudioService {
    * @param audioBuffer - Audio file buffer
    * @param mimeType - Audio MIME type
    * @param filename - Original filename
+   * @param title - Optional user-provided title
    */
   async processAudioUpload(
     userId: string,
     audioBuffer: Buffer,
     mimeType: string,
-    filename?: string
+    filename?: string,
+    title?: string
   ): Promise<AudioUploadResult> {
     try {
       logger.info(`Processing audio upload for user ${userId}`, {
@@ -109,6 +111,7 @@ export class AudioService {
       const audioLog = await AudioLog.create({
         userId: new mongoose.Types.ObjectId(userId),
         transcript,
+        title: title?.trim() || undefined, // Use user-provided title if available
         timestamp: new Date(),
         duration,
         audioUrl,

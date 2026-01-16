@@ -13,6 +13,7 @@ export interface CategorizationResult {
   confidence: number;
   sentiment: 'positive' | 'negative' | 'neutral' | 'mixed';
   keywords: string[];
+  title: string;
 }
 
 /**
@@ -76,6 +77,7 @@ export class AIService {
 2. A confidence score (0-1)
 3. Sentiment (positive, negative, neutral, or mixed)
 4. Up to 5 keywords
+5. A short, descriptive title (max 50 characters) that summarizes what the recording is about
 
 Transcript: "${transcript}"
 
@@ -84,7 +86,8 @@ Respond in JSON format only, no markdown or code blocks:
   "category": "string",
   "confidence": number,
   "sentiment": "string",
-  "keywords": ["string"]
+  "keywords": ["string"],
+  "title": "string"
 }`;
 
       const result = await this.callGeminiApi(prompt);
@@ -97,6 +100,7 @@ Respond in JSON format only, no markdown or code blocks:
         confidence: parsed.confidence || 0.5,
         sentiment: parsed.sentiment || 'neutral',
         keywords: parsed.keywords || [],
+        title: parsed.title || this.generateFallbackTitle(transcript),
       };
     } catch (error) {
       logger.error('Error categorizing transcript:', error);
@@ -107,6 +111,7 @@ Respond in JSON format only, no markdown or code blocks:
         confidence: 0,
         sentiment: 'neutral',
         keywords: [],
+        title: this.generateFallbackTitle(transcript),
       };
     }
   }
@@ -198,11 +203,16 @@ Respond in JSON format only, no markdown or code blocks:
 
     audioLog.category = categorization.category;
     audioLog.sentiment = categorization.sentiment;
+    // Only set AI-generated title if user didn't provide one
+    if (!audioLog.title) {
+      audioLog.title = categorization.title;
+    }
     if (!audioLog.metadata) audioLog.metadata = {};
     audioLog.metadata.keywords = categorization.keywords;
     audioLog.metadata.categoryConfidence = categorization.confidence;
 
     await audioLog.save();
+    logger.info(`Audio log categorized${!audioLog.title ? ` with title: "${categorization.title}"` : ' (user title preserved)'}`);
     return audioLog;
   }
 
