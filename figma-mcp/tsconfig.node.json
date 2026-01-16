@@ -1,0 +1,41 @@
+{
+    "compilerOptions": {
+        // Modern target for Node.js tooling
+        "target": "ES2022",
+        // Use ESNext modules for modern Node.js
+        "module": "ESNext",
+        // Node-style module resolution for tooling scripts
+        "moduleResolution": "Bundler",
+        // Library for Node.js environment
+        "lib": [
+            "ES2022"
+        ],
+        // Node.js type definitions
+        "types": [
+            "node"
+        ],
+        // Skip lib checking for faster tooling builds
+        "skipLibCheck": true,
+        // Strict mode for tooling quality
+        "strict": true,
+        // Allow JSON imports
+        "resolveJsonModule": true,
+        // ESM/CJS interop
+        "esModuleInterop": true,
+        // Isolated modules for performance
+        "isolatedModules": true,
+        // Don't emit (just type checking)
+        "noEmit": true,
+        // Allow synthetic default imports
+        "allowSyntheticDefaultImports": true,
+        // Consistent casing
+        "forceConsistentCasingInFileNames": true
+    },
+    // Include only tooling/config files (NOT React components)
+    "include": [
+        "vite.config.ts",
+        "tailwind.config.ts",
+        "postcss.config.js",
+        "scripts/**/*.ts"
+    ]
+}

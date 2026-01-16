@@ -1,0 +1,167 @@
+/**
+ * Global Styles - Tailwind CSS Entry Point
+ * 
+ * Import order matters:
+ * 1. Tailwind base/components/utilities
+ * 2. Custom animations
+ * 3. Typography overrides
+ * 4. Utility classes
+ */
+
+/* Tailwind CSS directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base layer customizations */
+@layer base {
+  :root {
+    --background: 5 5 5;
+    /* #050505 */
+    --foreground: 255 255 255;
+    /* White (handled by opacity) */
+
+    --card: 10 10 12;
+    /* #0A0A0C */
+    --card-foreground: 255 255 255;
+
+    --popover: 10 10 12;
+    --popover-foreground: 255 255 255;
+
+    --primary: 0 80 255;
+    /* #0050FF */
+    --primary-foreground: 255 255 255;
+
+    --secondary: 10 10 12;
+    --secondary-foreground: 255 255 255;
+
+    --muted: 20 20 22;
+    --muted-foreground: 160 160 160;
+
+    --accent: 0 214 255;
+    /* #00D6FF */
+    --accent-foreground: 5 5 5;
+
+    --destructive: 255 51 51;
+    /* #FF3333 */
+    --destructive-foreground: 255 255 255;
+
+    --border: 255 255 255;
+    --input: 255 255 255;
+    --ring: 0 80 255;
+  }
+
+  body {
+    @apply bg-bg-primary text-text-primary antialiased;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+  }
+}
+
+/* Component layer - reusable patterns */
+@layer components {
+
+  /* Glass effect utility */
+  .glass {
+    @apply backdrop-blur-md bg-white/5 border border-white/10;
+  }
+
+  /* Gradient text utility */
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent-primary to-accent-secondary;
+  }
+
+  /* Specific Design System Gradients */
+  .gradient-focus {
+    @apply bg-gradient-to-b from-transparent to-bg-primary;
+  }
+}
+
+/* Utility layer - custom utilities */
+@layer utilities {
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Screen reader only */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* Focus visible styles */
+  .focus-visible-ring {
+    @apply outline-none ring-2 ring-accent-primary ring-offset-2 ring-offset-bg-primary;
+  }
+
+  /* Navigation link styles */
+  .nav-link {
+    @apply text-text-secondary hover:text-text-primary transition-colors duration-200 text-sm font-medium;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-transparent rounded-md px-2 py-1 -mx-2 -my-1;
+  }
+
+  .nav-link-active {
+    @apply text-text-primary relative;
+  }
+
+  .nav-link-active::after {
+    content: '';
+    @apply absolute bottom-0 left-2 right-2 h-px bg-accent-primary;
+  }
+
+  /* GPU-accelerated transforms */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Custom scrollbar for content areas */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+  }
+}

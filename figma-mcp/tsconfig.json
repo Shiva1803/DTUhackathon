@@ -1,0 +1,102 @@
+{
+    "compilerOptions": {
+        // Modern ES target for optimal browser support (2020+)
+        "target": "ES2020",
+        // Use React 18's automatic JSX runtime (no need to import React)
+        "jsx": "react-jsx",
+        // Use modern module system
+        "module": "ESNext",
+        // Vite-optimized module resolution (replaces "node" for better ESM support)
+        "moduleResolution": "Bundler",
+        // Library inclusions for DOM, ES2020 features
+        "lib": [
+            "ES2020",
+            "DOM",
+            "DOM.Iterable"
+        ],
+        // Enable all strict type-checking options (production quality)
+        "strict": true,
+        // Prevent implicit any types - catch errors early
+        "noImplicitAny": true,
+        // Ensure consistent class field behavior with proposal spec
+        "useDefineForClassFields": true,
+        // Enable importing JSON files as modules
+        "resolveJsonModule": true,
+        // Ensure proper ESM interop with CommonJS modules
+        "esModuleInterop": true,
+        // Enforce consistent casing in imports (prevents cross-platform issues)
+        "forceConsistentCasingInFileNames": true,
+        // Skip lib checking for faster builds (we trust dependencies)
+        "skipLibCheck": true,
+        // Allow default imports from modules with no default export
+        "allowSyntheticDefaultImports": true,
+        // Isolated modules for better Vite HMR performance
+        "isolatedModules": true,
+        // Don't emit files (Vite handles bundling)
+        "noEmit": true,
+        // Catch errors with indexed access (prevents undefined runtime errors)
+        "noUncheckedIndexedAccess": true,
+        // Strict function types for better type safety
+        "strictFunctionTypes": true,
+        // Strict null checks (prevents null/undefined bugs)
+        "strictNullChecks": true,
+        // Strict bind/call/apply
+        "strictBindCallApply": true,
+        // Check for unused locals (clean code)
+        "noUnusedLocals": true,
+        // Check for unused parameters (clean code)
+        "noUnusedParameters": true,
+        // Ensure all code paths return a value
+        "noImplicitReturns": true,
+        // Report errors on fallthrough cases in switch
+        "noFallthroughCasesInSwitch": true,
+        // Base URL for path resolution
+        "baseUrl": ".",
+        // Path aliases for clean imports (must match Vite config)
+        "paths": {
+            "@/*": [
+                "src/*"
+            ],
+            "@components/*": [
+                "src/components/*"
+            ],
+            "@routes/*": [
+                "src/routes/*"
+            ],
+            "@stores/*": [
+                "src/stores/*"
+            ],
+            "@hooks/*": [
+                "src/hooks/*"
+            ],
+            "@api/*": [
+                "src/api/*"
+            ],
+            "@types/*": [
+                "src/types/*"
+            ],
+            "@utils/*": [
+                "src/utils/*"
+            ],
+            "@styles/*": [
+                "src/styles/*"
+            ],
+            "@lib/*": [
+                "src/lib/*"
+            ],
+            "@assets/*": [
+                "src/assets/*"
+            ]
+        }
+    },
+    // Include all source files
+    "include": [
+        "src"
+    ],
+    // Exclude build outputs and dependencies
+    "exclude": [
+        "node_modules",
+        "dist",
+        "server"
+    ]
+}
