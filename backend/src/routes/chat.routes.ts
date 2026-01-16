@@ -63,6 +63,7 @@ router.post(
           messageId: response.messageId,
           tokens: response.tokens,
           model: response.model,
+          suggestions: response.suggestions,
         },
         'Chat response generated'
       )

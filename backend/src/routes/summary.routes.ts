@@ -29,7 +29,7 @@ router.get(
     }
 
     const weekId = req.params['weekId'];
-    
+
     // Check if weekId exists
     if (!weekId) {
       res.status(400).json({
@@ -62,7 +62,7 @@ router.get(
       const parts = weekId.split('-W');
       const year = Number(parts[0]);
       const weekNum = Number(parts[1]);
-      
+
       if (!year || !weekNum || weekNum < 1 || weekNum > 53) {
         throw new NotFoundError('Summary not found for the specified week');
       }
@@ -105,7 +105,7 @@ router.get(
 
 /**
  * @route   GET /api/summary
- * @desc    Get all summaries for the current user
+ * @desc    Get current week summary for user (auto-generates if not exists)
  * @access  Private
  */
 router.get(
@@ -120,21 +120,85 @@ router.get(
       return;
     }
 
-    const { page, limit } = parsePagination(req.query as { page?: string; limit?: string });
-    const skip = (page - 1) * limit;
+    // Import week utilities
+    const { getWeekId, getWeekStart } = await import('../utils/week.utils');
 
-    const [summaries, total] = await Promise.all([
-      Summary.find({ userId: new mongoose.Types.ObjectId(req.user.id) })
-        .sort({ weekStart: -1 })
-        .skip(skip)
-        .limit(limit)
-        .exec(),
-      Summary.countDocuments({ userId: new mongoose.Types.ObjectId(req.user.id) }),
-    ]);
+    // Get current week
+    const currentWeekId = getWeekId();
+    const weekStartDate = getWeekStart(currentWeekId);
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
+    weekEndDate.setUTCHours(23, 59, 59, 999);
 
-    res.json(paginatedResponse(summaries, total, page, limit));
+    logger.debug(`Getting current week summary: ${currentWeekId} for user ${req.user.id}`);
+
+    // Try to find existing summary
+    let summary = await aiService.getSummary(req.user.id, currentWeekId);
+
+    // If no summary exists, auto-generate
+    if (!summary) {
+      logger.info(`Auto-generating summary for ${currentWeekId}, user ${req.user.id}`);
+      const result = await aiService.generateWeeklySummary(req.user.id, weekStartDate);
+      summary = result.summary;
+    }
+
+    // Derive phase from sentiment breakdown
+    const derivedPhase = derivePhaseFromMetrics(summary.metrics);
+
+    // Get user streak data
+    const { User } = await import('../models/User');
+    const user = await User.findById(req.user.id);
+
+    res.json(
+      successResponse(
+        {
+          id: summary._id.toString(),
+          weekId: currentWeekId,
+          weekStart: summary.weekStart,
+          weekEnd: summary.weekEnd,
+          phase: derivedPhase.phase,
+          phaseConfidence: derivedPhase.confidence,
+          metrics: summary.metrics,
+          story: summary.story,
+          ttsUrl: summary.ttsUrl,
+          generatedAt: summary.generatedAt,
+          isComplete: summary.isComplete,
+          streak: user ? {
+            current: user.streakCount || 0,
+            longest: user.longestStreak || 0,
+          } : null,
+        },
+        'Current week summary retrieved'
+      )
+    );
   })
 );
+
+/**
+ * Helper to derive phase from metrics
+ */
+function derivePhaseFromMetrics(metrics: {
+  categoryCounts?: Record<string, number>;
+  sentimentBreakdown?: { positive: number; negative: number; neutral: number; mixed: number };
+  totalLogs?: number;
+}): { phase: string; confidence: number } {
+  const { categoryCounts = {}, sentimentBreakdown = { positive: 0, negative: 0, neutral: 0, mixed: 0 } } = metrics;
+  const total = sentimentBreakdown.positive + sentimentBreakdown.negative + sentimentBreakdown.neutral + sentimentBreakdown.mixed;
+  const positiveRatio = total > 0 ? sentimentBreakdown.positive / total : 0;
+  const categories = Object.keys(categoryCounts);
+
+  if (positiveRatio > 0.7 && categories.includes('work')) {
+    return { phase: 'Builder', confidence: Math.round(positiveRatio * 100) };
+  } else if (categories.includes('learning')) {
+    return { phase: 'Explorer', confidence: Math.round((positiveRatio + 0.3) * 70) };
+  } else if (positiveRatio > 0.5) {
+    return { phase: 'Optimizer', confidence: Math.round(positiveRatio * 90) };
+  } else if (positiveRatio > 0.3) {
+    return { phase: 'Reflector', confidence: Math.round((1 - positiveRatio) * 60) };
+  } else {
+    return { phase: 'Explorer', confidence: 60 };
+  }
+}
 
 /**
  * @route   POST /api/summary/generate
@@ -164,7 +228,7 @@ router.post(
     }
 
     const weekStartDate = new Date(weekStart);
-    
+
     if (isNaN(weekStartDate.getTime())) {
       res.status(400).json({
         success: false,

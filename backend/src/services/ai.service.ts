@@ -2,6 +2,7 @@ import { AudioLog, IAudioLog } from '../models/AudioLog';
 import { Summary, ISummary, IMetrics } from '../models/Summary';
 import { ChatMessage, IChatMessage } from '../models/ChatMessage';
 import { logger } from '../utils/logger';
+import { getWeekStart, getWeekEnd, getWeekId } from '../utils/week.utils';
 import mongoose from 'mongoose';
 
 /**
@@ -76,10 +77,10 @@ Respond in JSON format:
 }`;
 
       const result = await this.callGeminiApi(prompt);
-      
+
       // Parse the JSON response
       const parsed = this.parseJsonResponse<CategorizationResult>(result);
-      
+
       return {
         category: parsed.category || 'other',
         confidence: parsed.confidence || 0.5,
@@ -88,7 +89,7 @@ Respond in JSON format:
       };
     } catch (error) {
       logger.error('Error categorizing transcript:', error);
-      
+
       // Return default categorization on error
       return {
         category: 'other',
@@ -284,10 +285,11 @@ Write a narrative that:
   }
 
   /**
-   * Generate TTS audio using Eleven Labs
+   * Generate TTS audio using Eleven Labs and upload to Cloudinary
    */
   private async generateTTS(text: string): Promise<string | undefined> {
     if (!this.elevenLabsApiKey) {
+      logger.warn('ELEVEN_KEY not configured - skipping TTS generation');
       return undefined;
     }
 
@@ -312,14 +314,31 @@ Write a narrative that:
         throw new Error(`Eleven Labs API error: ${response.status}`);
       }
 
-      // In a real implementation, you would:
-      // 1. Get the audio buffer from response
-      // 2. Upload to cloud storage (Cloudinary, S3, etc.)
-      // 3. Return the public URL
+      // Get audio buffer from response
+      const audioBuffer = Buffer.from(await response.arrayBuffer());
       
-      // For now, return undefined as full implementation depends on storage
-      logger.info('TTS generated successfully');
-      return undefined;
+      // Upload to Cloudinary
+      const cloudinary = await import('cloudinary');
+      
+      return new Promise<string | undefined>((resolve) => {
+        const uploadStream = cloudinary.v2.uploader.upload_stream(
+          {
+            resource_type: 'video', // Cloudinary uses 'video' for audio
+            folder: 'tts_summaries',
+            format: 'mp3',
+          },
+          (error, result) => {
+            if (error) {
+              logger.error('Failed to upload TTS to Cloudinary:', error);
+              resolve(undefined);
+              return;
+            }
+            logger.info('TTS uploaded to Cloudinary:', result?.public_id);
+            resolve(result?.secure_url);
+          }
+        );
+        uploadStream.end(audioBuffer);
+      });
     } catch (error) {
       logger.error('Error generating TTS:', error);
       return undefined;
@@ -419,7 +438,7 @@ Be warm, supportive, and non-judgmental. Ask thoughtful follow-up questions when
 
     try {
       const response = await fetch(
-        `${this.geminiApiUrl}/models/gemini-pro:generateContent?key=${this.geminiApiKey}`,
+        `${this.geminiApiUrl}/models/gemini-2.5-flash:generateContent?key=${this.geminiApiKey}`,
         {
           method: 'POST',
           headers: {
@@ -451,9 +470,9 @@ Be warm, supportive, and non-judgmental. Ask thoughtful follow-up questions when
           };
         }>;
       };
-      
+
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      
+
       if (!text) {
         throw new Error('No text in Gemini response');
       }
@@ -485,28 +504,37 @@ Be warm, supportive, and non-judgmental. Ask thoughtful follow-up questions when
    * Get summary for a specific week
    */
   async getSummary(userId: string, weekId: string): Promise<ISummary | null> {
-    // Parse weekId (format: YYYY-WW)
-    const [year, weekNum] = weekId.split('-W').map(Number);
-    
-    if (!year || !weekNum) {
+    try {
+      // Use the ISO week utilities for consistent calculation
+      const weekStart = getWeekStart(weekId);
+      const weekEnd = getWeekEnd(weekId);
+
+      logger.debug(`Looking for summary: weekId=${weekId}, weekStart=${weekStart.toISOString()}, weekEnd=${weekEnd.toISOString()}`);
+
+      // Search with a range to handle timezone differences
+      // The weekStart stored in the DB may differ by a day due to local timezone vs UTC
+      const searchRangeStart = new Date(weekStart);
+      searchRangeStart.setUTCDate(searchRangeStart.getUTCDate() - 1);
+
+      const searchRangeEnd = new Date(weekStart);
+      searchRangeEnd.setUTCDate(searchRangeEnd.getUTCDate() + 1);
+
+      const summary = await Summary.findOne({
+        userId: new mongoose.Types.ObjectId(userId),
+        weekStart: { $gte: searchRangeStart, $lte: searchRangeEnd },
+      });
+
+      if (summary) {
+        logger.debug(`Found summary for weekId=${weekId}, summaryId=${summary._id}`);
+      } else {
+        logger.debug(`No summary found for weekId=${weekId}`);
+      }
+
+      return summary;
+    } catch (error) {
+      logger.error(`Error getting summary for weekId=${weekId}:`, error);
       return null;
     }
-
-    // Calculate week start date
-    const jan1 = new Date(year, 0, 1);
-    const daysOffset = (weekNum - 1) * 7;
-    const weekStart = new Date(jan1.getTime() + daysOffset * 24 * 60 * 60 * 1000);
-    
-    // Adjust to Monday
-    const dayOfWeek = weekStart.getDay();
-    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-    weekStart.setDate(weekStart.getDate() + mondayOffset);
-    weekStart.setHours(0, 0, 0, 0);
-
-    return Summary.findOne({
-      userId: new mongoose.Types.ObjectId(userId),
-      weekStart: { $gte: weekStart, $lt: new Date(weekStart.getTime() + 24 * 60 * 60 * 1000) },
-    });
   }
 }
 

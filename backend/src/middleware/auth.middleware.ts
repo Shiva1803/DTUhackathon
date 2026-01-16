@@ -52,10 +52,12 @@ export const attachUser = async (
     const auth0Id = req.auth.sub;
     
     // Extract email and name from token
-    // Auth0 can include these in different claim namespaces
+    // Auth0 includes these in standard OIDC claims when 'openid profile email' scopes are requested
     const email = (req.auth['email'] as string) || 
                   (req.auth['https://your-namespace/email'] as string) || 
-                  `${auth0Id}@placeholder.com`;
+                  // Fallback: create a valid placeholder email from auth0Id
+                  // Replace invalid characters (|, :, etc.) with safe ones
+                  `${auth0Id.replace(/[|:]/g, '_')}@auth0.placeholder.local`;
     
     const name = (req.auth['name'] as string) ||
                  (req.auth['https://your-namespace/name'] as string) ||

@@ -11,7 +11,7 @@ import { logger } from '../utils/logger';
 const router = Router();
 
 /**
- * Allowed audio MIME types (MP3 and WAV only)
+ * Allowed audio MIME types (MP3, WAV, and WebM for browser compatibility)
  */
 const ALLOWED_AUDIO_TYPES = [
   'audio/mp3',
@@ -19,6 +19,8 @@ const ALLOWED_AUDIO_TYPES = [
   'audio/wav',
   'audio/x-wav',     // WAV
   'audio/wave',
+  'audio/webm',      // WebM (browser default)
+  'audio/ogg',       // Ogg Vorbis
 ];
 
 /**
@@ -153,6 +155,14 @@ router.post(
         req.file.originalname
       );
 
+      // Update user streak
+      const { User } = await import('../models/User');
+      const user = await User.findById(req.user.id);
+      if (user) {
+        await user.updateStreak();
+        logger.info(`Streak updated for user ${req.user.id}: ${user.streakCount} days`);
+      }
+
       // Optionally categorize the transcript asynchronously
       aiService.categorizeAudioLog(result.audioLog._id.toString(), req.user.id)
         .catch((error) => logger.error('Background categorization failed:', error));
@@ -167,12 +177,16 @@ router.post(
           duration: result.duration,
           audioUrl: result.audioUrl,
           timestamp: result.audioLog.timestamp,
+          streak: user ? {
+            current: user.streakCount,
+            longest: user.longestStreak,
+          } : null,
         },
       });
     } catch (error) {
       // Error: Cloudinary/upload failure or transcription failure
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       if (errorMessage.includes('Cloudinary')) {
         logger.error('Cloudinary upload failure:', error);
         res.status(500).json({

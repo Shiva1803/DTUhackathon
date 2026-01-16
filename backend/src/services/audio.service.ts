@@ -18,10 +18,10 @@ if (CLOUDINARY_URL) {
 }
 
 /**
- * OnDemand Media API configuration
+ * OnDemand Services API configuration
+ * Endpoint: POST https://api.on-demand.io/execute/speech_to_text
  */
-const OND_MEDIA_API_URL = process.env.OND_MEDIA_URL || 'https://api.on-demand.io/media/v1';
-const OND_MEDIA_KEY = process.env.OND_MEDIA_KEY || '';
+const OND_API_KEY = process.env.OND_MEDIA_KEY || '';
 
 /**
  * Audio upload result interface
@@ -31,19 +31,6 @@ export interface AudioUploadResult {
   transcript: string;
   duration?: number;
   audioUrl?: string;
-}
-
-/**
- * OnDemand Media API transcription response
- */
-interface OnDemandTranscriptionResponse {
-  id: string;
-  status: 'completed' | 'processing' | 'failed';
-  transcript?: string;
-  duration?: number;
-  language?: string;
-  confidence?: number;
-  error?: string;
 }
 
 /**
@@ -60,17 +47,15 @@ interface CloudinaryUploadResult {
 
 /**
  * Audio Service
- * Handles audio file uploads to Cloudinary and transcription via OnDemand Media API
+ * Handles audio file uploads to Cloudinary and transcription via OnDemand Services API
  */
 export class AudioService {
-  private readonly mediaApiUrl: string;
-  private readonly mediaApiKey: string;
+  private readonly apiKey: string;
 
   constructor() {
-    this.mediaApiUrl = OND_MEDIA_API_URL;
-    this.mediaApiKey = OND_MEDIA_KEY;
+    this.apiKey = OND_API_KEY;
 
-    if (!this.mediaApiKey) {
+    if (!this.apiKey) {
       logger.warn('OND_MEDIA_KEY not configured - transcription will use fallback');
     }
   }
@@ -105,21 +90,20 @@ export class AudioService {
         logger.info(`Audio uploaded to Cloudinary: ${cloudinaryResult.publicId}`);
       }
 
-      // Step 2: Transcribe audio
+      // Step 2: Transcribe audio using OnDemand API (requires Cloudinary URL)
       let transcript: string;
-      let duration: number | undefined;
-
-      if (audioUrl) {
-        // Transcribe using URL (preferred)
-        const transcriptionResult = await this.transcribeAudio(audioUrl);
+      
+      if (audioUrl && this.apiKey) {
+        const transcriptionResult = await this.transcribeAudioFromUrl(audioUrl);
         transcript = transcriptionResult.transcript;
-        duration = transcriptionResult.duration || cloudinaryResult?.duration;
+      } else if (!this.apiKey) {
+        logger.warn('Using mock transcription - OND_MEDIA_KEY not configured');
+        transcript = '[Mock transcription - Configure OND_MEDIA_KEY for real transcription] Today I worked on my project and made good progress.';
       } else {
-        // Transcribe using buffer directly (fallback)
-        const transcriptionResult = await this.transcribeAudioBuffer(audioBuffer, mimeType);
-        transcript = transcriptionResult.transcript;
-        duration = transcriptionResult.duration;
+        transcript = '[Audio uploaded but transcription requires Cloudinary URL]';
       }
+      
+      const duration = cloudinaryResult?.duration;
 
       // Step 3: Create audio log entry
       const audioLog = await AudioLog.create({
@@ -199,158 +183,73 @@ export class AudioService {
   }
 
   /**
-   * Transcribe audio from URL using OnDemand Media API
-   * @param audioUrl - Public URL of the audio file
-   * @returns Transcription result
-   * 
-   * Note: If OnDemand Media is unavailable, fallback to Google Cloud Speech
-   * can be implemented here (not implemented - placeholder for future)
+   * Transcribe audio using OnDemand Services API
+   * Endpoint: POST https://api.on-demand.io/services/v1/public/service/execute/speech_to_text
+   * @param audioUrl - Public URL of the audio file (from Cloudinary)
    */
-  async transcribeAudio(audioUrl: string): Promise<{ transcript: string; duration?: number; language?: string }> {
-    if (!this.mediaApiKey) {
-      logger.warn('Using mock transcription - OND_MEDIA_KEY not configured');
-      // FALLBACK NOTE: Here you could implement Google Cloud Speech-to-Text
-      // const speech = require('@google-cloud/speech');
-      // const client = new speech.SpeechClient();
-      // ... Google Cloud Speech implementation
-      return {
-        transcript: '[Mock transcription - Configure OND_MEDIA_KEY for real transcription]',
-        duration: 0,
-      };
-    }
-
+  private async transcribeAudioFromUrl(
+    audioUrl: string
+  ): Promise<{ transcript: string }> {
     try {
-      // Start transcription job
-      const startResponse = await axios.post<{ id: string; status: string }>(
-        `${this.mediaApiUrl}/transcribe`,
+      logger.info('Calling OnDemand speech_to_text API', { audioUrl });
+      
+      const response = await axios.post<{
+        message: string;
+        data: { text: string };
+      }>(
+        'https://api.on-demand.io/services/v1/public/service/execute/speech_to_text',
         {
-          url: audioUrl,
-          language: 'en', // Auto-detect could be implemented
-          model: 'whisper-1',
+          audioUrl: audioUrl,
         },
         {
           headers: {
             'Content-Type': 'application/json',
-            'apikey': this.mediaApiKey,
+            'apikey': this.apiKey,
           },
-          timeout: 30000,
+          timeout: 120000, // 2 minute timeout for transcription
         }
       );
 
-      const jobId = startResponse.data.id;
-      logger.debug(`Transcription job started: ${jobId}`);
+      const transcript = response.data?.data?.text || '';
+      
+      if (!transcript) {
+        logger.warn('OnDemand API returned empty transcript');
+        return {
+          transcript: '[Audio could not be transcribed - please try again with clearer audio]',
+        };
+      }
 
-      // Poll for completion (with timeout)
-      const result = await this.pollTranscriptionResult(jobId, 120000); // 2 minute timeout
-
+      logger.info('Audio transcribed successfully via OnDemand API');
       return {
-        transcript: result.transcript || '',
-        duration: result.duration,
-        language: result.language,
+        transcript: transcript.trim(),
       };
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        const axiosError = error as AxiosError<{ error?: { message?: string } }>;
-        const errorMessage = axiosError.response?.data?.error?.message || axiosError.message;
+        const axiosError = error as AxiosError<{ message?: string; error?: string; errorCode?: string }>;
+        const status = axiosError.response?.status;
+        const errorMsg = axiosError.response?.data?.message || axiosError.response?.data?.error || axiosError.message;
+        const errorCode = axiosError.response?.data?.errorCode;
         
-        logger.error('OnDemand Media API error:', {
-          status: axiosError.response?.status,
-          message: errorMessage,
+        logger.error('OnDemand transcription error:', {
+          status,
+          message: errorMsg,
+          errorCode,
         });
-
-        // FALLBACK NOTE: If OnDemand fails, fallback to Google Cloud Speech could be triggered here
-        // For now, throw the error
-        throw new Error(`Transcription API error: ${errorMessage}`);
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Transcribe audio from buffer directly
-   * @param audioBuffer - Audio file buffer
-   * @param mimeType - Audio MIME type
-   */
-  private async transcribeAudioBuffer(
-    audioBuffer: Buffer,
-    mimeType: string
-  ): Promise<{ transcript: string; duration?: number }> {
-    if (!this.mediaApiKey) {
-      logger.warn('Using mock transcription - OND_MEDIA_KEY not configured');
-      return {
-        transcript: '[Mock transcription - Configure OND_MEDIA_KEY for real transcription]',
-      };
-    }
-
-    try {
-      // Create form data for direct upload
-      const FormData = (await import('form-data')).default;
-      const formData = new FormData();
-      formData.append('file', audioBuffer, {
-        filename: `audio.${this.getFormatFromMimeType(mimeType)}`,
-        contentType: mimeType,
-      });
-      formData.append('language', 'en');
-      formData.append('model', 'whisper-1');
-
-      const response = await axios.post<OnDemandTranscriptionResponse>(
-        `${this.mediaApiUrl}/transcribe/file`,
-        formData,
-        {
-          headers: {
-            ...formData.getHeaders(),
-            'apikey': this.mediaApiKey,
-          },
-          timeout: 120000, // 2 minute timeout for upload + transcription
+        
+        if (errorCode === 'invalid_request' && errorMsg?.includes('subscribe')) {
+          throw new Error('Speech-to-text service not subscribed. Please subscribe in OnDemand dashboard.');
+        } else if (status === 400) {
+          throw new Error('Invalid audio URL or format. Please try recording again.');
+        } else if (status === 401) {
+          throw new Error('Transcription service authentication failed. Check API key.');
+        } else {
+          throw new Error(`Transcription failed: ${errorMsg}`);
         }
-      );
-
-      return {
-        transcript: response.data.transcript || '',
-        duration: response.data.duration,
-      };
-    } catch (error) {
-      logger.error('Buffer transcription error:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Poll for transcription result
-   * @param jobId - Transcription job ID
-   * @param timeoutMs - Maximum time to wait
-   */
-  private async pollTranscriptionResult(
-    jobId: string,
-    timeoutMs: number
-  ): Promise<OnDemandTranscriptionResponse> {
-    const startTime = Date.now();
-    const pollInterval = 2000; // 2 seconds
-
-    while (Date.now() - startTime < timeoutMs) {
-      const response = await axios.get<OnDemandTranscriptionResponse>(
-        `${this.mediaApiUrl}/transcribe/${jobId}`,
-        {
-          headers: {
-            'apikey': this.mediaApiKey,
-          },
-          timeout: 10000,
-        }
-      );
-
-      if (response.data.status === 'completed') {
-        return response.data;
       }
-
-      if (response.data.status === 'failed') {
-        throw new Error(`Transcription failed: ${response.data.error || 'Unknown error'}`);
-      }
-
-      // Wait before polling again
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      
+      logger.error('Transcription error:', error);
+      throw new Error('Transcription failed. Please try again.');
     }
-
-    throw new Error('Transcription timed out');
   }
 
   /**

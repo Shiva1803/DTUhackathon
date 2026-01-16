@@ -46,6 +46,7 @@ export interface ChatServiceResponse {
   messageId: string;
   tokens?: number;
   model?: string;
+  suggestions?: string[];
 }
 
 /**
@@ -133,17 +134,63 @@ export class ChatService {
         assistantMessageId: assistantMessage._id.toString(),
       });
 
+      // Generate contextual suggestions based on the conversation
+      const suggestions = this.generateSuggestions(message, response.message);
+
       return {
         sessionId,
         message: response.message,
         messageId: assistantMessage._id.toString(),
         tokens: response.usage?.total_tokens,
         model: response.model,
+        suggestions,
       };
     } catch (error) {
       logger.error('Error in chat service:', error);
       throw error;
     }
+  }
+
+  /**
+   * Generate contextual follow-up suggestions
+   */
+  private generateSuggestions(userMessage: string, aiResponse: string): string[] {
+    const suggestions: string[] = [];
+    const lowerMessage = userMessage.toLowerCase();
+    const lowerResponse = aiResponse.toLowerCase();
+
+    // Goal-related suggestions
+    if (lowerMessage.includes('goal') || lowerResponse.includes('goal')) {
+      suggestions.push('How can I break this goal into smaller steps?');
+      suggestions.push('What habits support this goal?');
+    }
+
+    // Productivity suggestions
+    if (lowerMessage.includes('productivity') || lowerMessage.includes('work') || lowerResponse.includes('productive')) {
+      suggestions.push('What are my most productive times?');
+      suggestions.push('How can I improve my focus?');
+    }
+
+    // Reflection suggestions
+    if (lowerMessage.includes('feel') || lowerMessage.includes('stress') || lowerResponse.includes('reflect')) {
+      suggestions.push('What patterns do you see in my logs?');
+      suggestions.push('How can I better manage stress?');
+    }
+
+    // Summary suggestions
+    if (lowerMessage.includes('week') || lowerMessage.includes('summary')) {
+      suggestions.push('What should I focus on next week?');
+      suggestions.push('What were my biggest achievements?');
+    }
+
+    // Default suggestions if none matched
+    if (suggestions.length === 0) {
+      suggestions.push('Tell me more about my patterns');
+      suggestions.push('What should I work on next?');
+      suggestions.push('How am I progressing?');
+    }
+
+    return suggestions.slice(0, 3); // Return max 3 suggestions
   }
 
   /**
@@ -190,7 +237,7 @@ export class ChatService {
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError<OnDemandChatError>;
         const errorMessage = axiosError.response?.data?.error?.message || axiosError.message;
-        
+
         logger.error('OnDemand Chat API error:', {
           status: axiosError.response?.status,
           message: errorMessage,
