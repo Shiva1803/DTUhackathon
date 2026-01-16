@@ -9,7 +9,7 @@ import { logger } from '../utils/logger';
 const router = Router();
 
 /**
- * @route   GET /auth/me
+ * @route   GET /api/auth/me
  * @desc    Get current authenticated user's profile
  * @access  Private (requires valid JWT)
  */
@@ -43,8 +43,9 @@ router.get(
       successResponse(
         {
           id: user._id.toString(),
-          auth0Id: user.auth0Id,
+          name: user.name || null,
           email: user.email,
+          auth0Id: user.auth0Id,
           createdAt: user.createdAt,
           lastLogin: user.lastLogin,
         },
@@ -55,12 +56,11 @@ router.get(
 );
 
 /**
- * @route   GET /auth/profile
- * @desc    Alias for /auth/me
+ * @route   GET /api/auth/profile
+ * @desc    Alias for /api/auth/me
  * @access  Private
  */
 router.get('/profile', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  // Redirect to /me handler logic
   if (!req.user) {
     res.status(401).json({
       success: false,
@@ -82,8 +82,9 @@ router.get('/profile', authenticate, asyncHandler(async (req: AuthenticatedReque
   res.json(
     successResponse({
       id: user._id.toString(),
-      auth0Id: user.auth0Id,
+      name: user.name || null,
       email: user.email,
+      auth0Id: user.auth0Id,
       createdAt: user.createdAt,
       lastLogin: user.lastLogin,
     })

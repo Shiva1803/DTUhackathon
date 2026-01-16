@@ -7,6 +7,7 @@ export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   auth0Id: string;
   email: string;
+  name?: string;
   createdAt: Date;
   lastLogin: Date;
 }
@@ -34,6 +35,11 @@ const userSchema = new Schema<IUser>(
         /^[\w-]+(\.[\w-]+)*@([\w-]+\.)+[a-zA-Z]{2,7}$/,
         'Please provide a valid email address',
       ],
+    },
+    name: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Name cannot exceed 100 characters'],
     },
     createdAt: {
       type: Date,

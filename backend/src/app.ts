@@ -134,7 +134,7 @@ export const createApp = (): Application => {
   // ===========================================
   
   // Auth routes
-  app.use('/auth', authRoutes);
+  app.use('/api/auth', authRoutes);
   
   // API routes
   app.use('/api/log', logRoutes);

@@ -51,27 +51,37 @@ export const attachUser = async (
 
     const auth0Id = req.auth.sub;
     
+    // Extract email and name from token
+    // Auth0 can include these in different claim namespaces
+    const email = (req.auth['email'] as string) || 
+                  (req.auth['https://your-namespace/email'] as string) || 
+                  `${auth0Id}@placeholder.com`;
+    
+    const name = (req.auth['name'] as string) ||
+                 (req.auth['https://your-namespace/name'] as string) ||
+                 (req.auth['nickname'] as string) ||
+                 undefined;
+    
     // Find or create user
     let user = await User.findOne({ auth0Id });
     
     if (!user) {
       // Create new user on first login
-      // Extract email from token if available, otherwise use placeholder
-      const email = (req.auth['email'] as string) || 
-                    (req.auth['https://your-namespace/email'] as string) || 
-                    `${auth0Id}@placeholder.com`;
-      
       user = await User.create({
         auth0Id,
         email,
+        name,
         createdAt: new Date(),
         lastLogin: new Date(),
       });
       
       logger.info(`New user created: ${auth0Id}`);
     } else {
-      // Update last login
+      // Update last login and sync name/email if changed
       user.lastLogin = new Date();
+      if (name && user.name !== name) {
+        user.name = name;
+      }
       await user.save();
     }
 
@@ -80,6 +90,7 @@ export const attachUser = async (
       id: user._id.toString(),
       auth0Id: user.auth0Id,
       email: user.email,
+      name: user.name,
     };
 
     next();

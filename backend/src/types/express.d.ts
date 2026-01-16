@@ -19,6 +19,7 @@ export interface AuthenticatedRequest extends Request {
     id: string;            // MongoDB ObjectId as string
     auth0Id: string;       // Auth0 user ID
     email: string;         // User email
+    name?: string;         // User display name
   };
 }
 
@@ -43,4 +44,5 @@ export interface UserSession {
   id: string;
   auth0Id: string;
   email: string;
+  name?: string;
 }
