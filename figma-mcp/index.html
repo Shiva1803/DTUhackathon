@@ -43,12 +43,6 @@
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     
-    <!-- Prevent FOUC -->
-    <style>
-      html { background-color: #050505; }
-      body { opacity: 0; transition: opacity 0.2s ease-in; }
-      body.loaded { opacity: 1; }
-    </style>
   </head>
   
   <body class="antialiased">
@@ -57,10 +51,5 @@
     
     <!-- Vite Entry Point -->
     <script type="module" src="/src/main.tsx"></script>
-    
-    <!-- Reveal body after load -->
-    <script>
-      document.body.classList.add('loaded');
-    </script>
   </body>
 </html>

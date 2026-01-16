@@ -6,7 +6,6 @@ import { Layout } from '@/components/layout/Layout';
 import { ErrorBoundary } from '@/components/error/ErrorBoundary';
 import { ScreenReaderAnnouncer } from '@/components/a11y/ScreenReaderAnnouncer';
 import { OfflineIndicator } from '@/components/ui/OfflineIndicator';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import '@/styles/index.css';
 
 // Lazy load route components for better performance
@@ -26,7 +25,7 @@ function AnimatedRoutes() {
 
     return (
         <AnimatePresence mode="wait">
-            <Suspense fallback={<LoadingSpinner fullScreen />}>
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
                 <Routes location={location} key={location.pathname}>
                     <Route path="/" element={<Landing />} />
 
@@ -62,5 +61,6 @@ function App() {
         </ErrorBoundary>
     );
 }
+
 
 export default App;
