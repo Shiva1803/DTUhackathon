@@ -1,6 +1,6 @@
-# GrowthAmp Frontend
+# Parallax Frontend
 
-React + TypeScript frontend for the GrowthAmp personal growth journal application.
+React + TypeScript frontend for the Parallax personal growth journal application.
 
 ## Tech Stack
 

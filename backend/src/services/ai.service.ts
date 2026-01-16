@@ -13,6 +13,7 @@ export interface CategorizationResult {
   confidence: number;
   sentiment: 'positive' | 'negative' | 'neutral' | 'mixed';
   keywords: string[];
+  title: string;
 }
 
 /**
@@ -65,6 +66,7 @@ export class AIService {
 2. A confidence score (0-1)
 3. Sentiment (positive, negative, neutral, or mixed)
 4. Up to 5 keywords
+5. A short, descriptive title (max 50 characters) that summarizes what the recording is about
 
 Transcript: "${transcript}"
 
@@ -73,7 +75,8 @@ Respond in JSON format:
   "category": "string",
   "confidence": number,
   "sentiment": "string",
-  "keywords": ["string"]
+  "keywords": ["string"],
+  "title": "string"
 }`;
 
       const result = await this.callGeminiApi(prompt);
@@ -86,6 +89,7 @@ Respond in JSON format:
         confidence: parsed.confidence || 0.5,
         sentiment: parsed.sentiment || 'neutral',
         keywords: parsed.keywords || [],
+        title: parsed.title || this.generateFallbackTitle(transcript),
       };
     } catch (error) {
       logger.error('Error categorizing transcript:', error);
@@ -96,7 +100,51 @@ Respond in JSON format:
         confidence: 0,
         sentiment: 'neutral',
         keywords: [],
+        title: this.generateFallbackTitle(transcript),
       };
+    }
+  }
+
+  /**
+   * Generate a fallback title from transcript when AI fails
+   * @param transcript - The transcript text
+   */
+  private generateFallbackTitle(transcript: string): string {
+    // Take first 50 characters and clean up
+    const cleaned = transcript.trim().replace(/\s+/g, ' ');
+    if (cleaned.length <= 50) {
+      return cleaned;
+    }
+    // Find last space before 50 chars to avoid cutting words
+    const truncated = cleaned.substring(0, 50);
+    const lastSpace = truncated.lastIndexOf(' ');
+    return (lastSpace > 20 ? truncated.substring(0, lastSpace) : truncated) + '...';
+  }
+
+  /**
+   * Generate title for a transcript using AI
+   * @param transcript - Text to generate title for
+   */
+  async generateTitle(transcript: string): Promise<string> {
+    try {
+      const prompt = `Generate a short, descriptive title (max 50 characters) that summarizes what this recording is about. The title should be clear and help the user understand the content at a glance.
+
+Transcript: "${transcript.substring(0, 500)}"
+
+Respond with just the title, no quotes or extra formatting.`;
+
+      const result = await this.callGeminiApi(prompt);
+      const title = result.trim().replace(/^["']|["']$/g, ''); // Remove quotes if present
+      
+      // Ensure title is not too long
+      if (title.length > 60) {
+        return title.substring(0, 57) + '...';
+      }
+      
+      return title || this.generateFallbackTitle(transcript);
+    } catch (error) {
+      logger.error('Error generating title:', error);
+      return this.generateFallbackTitle(transcript);
     }
   }
 
@@ -119,11 +167,16 @@ Respond in JSON format:
 
     audioLog.category = categorization.category;
     audioLog.sentiment = categorization.sentiment;
+    // Only set AI-generated title if user didn't provide one
+    if (!audioLog.title) {
+      audioLog.title = categorization.title;
+    }
     if (!audioLog.metadata) audioLog.metadata = {};
     audioLog.metadata.keywords = categorization.keywords;
     audioLog.metadata.categoryConfidence = categorization.confidence;
 
     await audioLog.save();
+    logger.info(`Audio log categorized${!audioLog.title ? ` with title: "${categorization.title}"` : ' (user title preserved)'}`);
     return audioLog;
   }
 

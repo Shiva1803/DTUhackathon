@@ -143,6 +143,9 @@ router.post(
       mimetype: req.file.mimetype,
     });
 
+    // Get title from form data
+    const title = req.body.title as string | undefined;
+
     try {
       // Process the audio upload:
       // 1. Upload to Cloudinary (if configured, else skip)
@@ -152,7 +155,8 @@ router.post(
         req.user.id,
         req.file.buffer,
         req.file.mimetype,
-        req.file.originalname
+        req.file.originalname,
+        title
       );
 
       // Update user streak
