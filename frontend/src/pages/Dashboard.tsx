@@ -251,7 +251,7 @@ export default function Dashboard() {
   const mouseY = useMotionValue(0);
   const springConfig = { damping: 25, stiffness: 150 };
   const smoothMouseX = useSpring(mouseX, springConfig);
-  const smoothMouseY = useSpring(mouseY, springConfig);
+  useSpring(mouseY, springConfig); // Used for parallax effect
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;

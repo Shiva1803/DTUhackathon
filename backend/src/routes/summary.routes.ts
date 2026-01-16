@@ -11,6 +11,68 @@ import mongoose from 'mongoose';
 const router = Router();
 
 /**
+ * @route   GET /api/summary/activities
+ * @desc    Get activity tracking summary (5 categories based on last 10 logs)
+ * @access  Private
+ */
+router.get(
+  '/activities',
+  authenticate,
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'User not authenticated', statusCode: 401 },
+      });
+      return;
+    }
+
+    logger.debug(`Fetching activity summary for user ${req.user.id}`);
+
+    const activitySummary = await aiService.getActivitySummary(req.user.id);
+
+    if (!activitySummary) {
+      res.json(
+        successResponse({
+          counts: { growth: 0, health: 0, work: 0, consumption: 0, other: 0 },
+          recentLogs: [],
+          review: 'Start recording your daily reflections to get personalized insights about your life patterns.',
+          totalLogs: 0,
+        }, 'No activity data yet')
+      );
+      return;
+    }
+
+    res.json(successResponse(activitySummary, 'Activity summary retrieved'));
+  })
+);
+
+/**
+ * @route   POST /api/summary/activities/review
+ * @desc    Generate a fresh activity review
+ * @access  Private
+ */
+router.post(
+  '/activities/review',
+  authenticate,
+  asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user) {
+      res.status(401).json({
+        success: false,
+        error: { message: 'User not authenticated', statusCode: 401 },
+      });
+      return;
+    }
+
+    logger.info(`Generating fresh activity review for user ${req.user.id}`);
+
+    const review = await aiService.generateActivityReview(req.user.id);
+
+    res.json(successResponse({ review }, 'Activity review generated'));
+  })
+);
+
+/**
  * @route   GET /api/summary/:weekId
  * @desc    Get weekly summary for a specific week
  * @param   weekId - Week identifier in format YYYY-WNN (e.g., 2024-W01)

@@ -177,7 +177,344 @@ Respond with just the title, no quotes or extra formatting.`;
 
     await audioLog.save();
     logger.info(`Audio log categorized${!audioLog.title ? ` with title: "${categorization.title}"` : ' (user title preserved)'}`);
+    
+    // Also analyze activities and update tracker
+    await this.analyzeAndTrackActivities(audioLogId, userId, audioLog.transcript, audioLog.title);
+    
     return audioLog;
+  }
+
+  /**
+   * STEP 1: Extract activities from transcript
+   * Uses the exact prompt provided by user
+   */
+  async extractActivities(transcript: string): Promise<{ activity: string; context: string }[]> {
+    try {
+      const prompt = `You are an activity extraction assistant. Analyze the following voice-to-text transcript of a daily log and extract all activities mentioned.
+
+TRANSCRIPT:
+${transcript}
+
+Your task:
+1. Carefully read through the entire transcript
+2. Identify ALL activities, tasks, habits, or events the person mentions doing or experiencing
+3. Extract both explicit activities (e.g., "I went to the gym") and implicit ones (e.g., "had pizza for dinner" = ate junk food)
+4. Include health-related activities (exercise, meals, sleep, mental health practices)
+5. Include work/productivity activities (meetings, coding, studying, projects)
+6. Include learning/growth activities (reading, courses, skill development)
+7. Include consumption activities (TV shows, social media, movies, games)
+8. Include any other miscellaneous activities
+
+Return your response as a JSON object with this exact structure:
+{
+  "activities": [
+    {
+      "activity": "brief description of the activity",
+      "context": "any relevant details or duration mentioned"
+    }
+  ]
+}
+
+Rules:
+- If absolutely NO activities are mentioned (highly unlikely), return: {"activities": [{"activity": "N/A", "context": "No activities discussed"}]}
+- Be thorough - don't miss activities mentioned casually in conversation
+- Keep descriptions clear and concise
+- Focus on actionable activities, not just thoughts or feelings (unless they involve specific practices like meditation or journaling)
+
+Return ONLY the JSON object, no additional text.`;
+
+      const result = await this.callGeminiApi(prompt);
+      const parsed = this.parseJsonResponse<{ activities: { activity: string; context: string }[] }>(result);
+
+      return parsed.activities || [{ activity: 'N/A', context: 'No activities discussed' }];
+    } catch (error) {
+      logger.error('Error extracting activities:', error);
+      return [{ activity: 'N/A', context: 'Error extracting activities' }];
+    }
+  }
+
+  /**
+   * STEP 2: Classify activities into categories with points
+   * Uses the exact prompt provided by user
+   */
+  async classifyActivities(activities: { activity: string; context: string }[]): Promise<{
+    categoryPoints: { growth: number; health: number; work: number; consumption: number; other: number };
+    classificationDetails: { activity: string; category: string; points: number; reasoning: string }[];
+  }> {
+    try {
+      const activitiesJson = JSON.stringify(activities, null, 2);
+
+      const prompt = `You are a life tracking classifier. You will receive a list of activities and must classify each one into specific categories with point values.
+
+ACTIVITIES:
+${activitiesJson}
+
+CLASSIFICATION CATEGORIES:
+
+1. **Growth** (Learning & Development)
+   - +1: Reading books, taking courses, learning new skills, practicing instruments, language learning, educational content, personal development activities, journaling for self-reflection
+   - -1: Avoiding learning opportunities, procrastinating on development goals
+
+2. **Health** (Physical & Mental Wellness)
+   - +1: Exercise/workout, healthy meals, adequate sleep, meditation, yoga, mental health practices, drinking water, taking breaks, outdoor activities
+   - -1: Junk food, excessive alcohol, smoking, skipping meals, poor sleep, sedentary behavior, stress without coping mechanisms
+
+3. **Work** (Professional Productivity)
+   - +1: Completing work tasks, attending meetings, coding/developing, studying for work/school, project progress, focused work sessions
+   - -1: Procrastinating on work, missing deadlines, unproductive work time
+
+4. **Consumption** (Passive Entertainment)
+   - +1: Never assign positive points to consumption (this is a passive category)
+   - -1: Watching TV/movies, social media scrolling, gaming (recreational, not educational), binge-watching content, excessive phone use
+
+5. **Other** (Miscellaneous Activities)
+   - +1: ONLY if there are genuinely no activities that fit the above 4 categories (least preferred option)
+   - This should rarely be used
+
+CLASSIFICATION RULES:
+1. Each activity can affect MULTIPLE categories (e.g., "cooked a healthy meal" = +1 Health, +1 Work if mentioned as productive)
+2. Assign points based on the nature and impact of each activity
+3. An activity can give both positive and negative points to different categories (e.g., "worked late into the night" = +1 Work, -1 Health)
+4. Be precise: "ate food" without context = 0 points; "ate salad" = +1 Health; "ate fast food" = -1 Health
+5. Only use "Other" when activities genuinely don't fit any category
+6. If activities is "N/A", assign +1 to Other only
+
+Return your response as a JSON object with this exact structure:
+{
+  "category_points": {
+    "growth": 0,
+    "health": 0,
+    "work": 0,
+    "consumption": 0,
+    "other": 0
+  },
+  "classification_details": [
+    {
+      "activity": "activity description",
+      "category": "category name",
+      "points": +1 or -1,
+      "reasoning": "brief explanation"
+    }
+  ]
+}
+
+Return ONLY the JSON object, no additional text.`;
+
+      const result = await this.callGeminiApi(prompt);
+      const parsed = this.parseJsonResponse<{
+        category_points: { growth: number; health: number; work: number; consumption: number; other: number };
+        classification_details: { activity: string; category: string; points: number; reasoning: string }[];
+      }>(result);
+
+      return {
+        categoryPoints: parsed.category_points || { growth: 0, health: 0, work: 0, consumption: 0, other: 0 },
+        classificationDetails: parsed.classification_details || [],
+      };
+    } catch (error) {
+      logger.error('Error classifying activities:', error);
+      return {
+        categoryPoints: { growth: 0, health: 0, work: 0, consumption: 0, other: 0 },
+        classificationDetails: [],
+      };
+    }
+  }
+
+  /**
+   * STEP 3: Generate personal review based on aggregated counts
+   * Uses the exact prompt provided by user
+   */
+  async generatePersonalReview(counts: { growth: number; health: number; work: number; consumption: number; other: number }): Promise<string> {
+    try {
+      const prompt = `You are a life coach providing personalized feedback. Based on the activity classification scores (excluding "Other"), provide a brief review of future prospects and actionable suggestions.
+
+CATEGORY SCORES:
+- Growth: ${counts.growth}
+- Health: ${counts.health}
+- Work: ${counts.work}
+- Consumption: ${counts.consumption}
+
+Your task:
+1. Analyze the pattern across all 4 categories (ignore "Other")
+2. Identify strengths (positive scores) and areas of concern (negative scores)
+3. Provide 2-3 specific, actionable suggestions for improvement
+4. Keep the tone encouraging but honest
+5. Focus on the most impactful changes they can make
+
+Write a review in approximately 100 words that includes:
+- A brief assessment of their current trajectory
+- Recognition of what they're doing well
+- Specific suggestions for improvement prioritized by impact
+- An encouraging closing statement
+
+Keep it concise, actionable, and motivating. Write in second person ("you"). Return ONLY the review text, nothing else.`;
+
+      const review = await this.callGeminiApi(prompt);
+      return review.trim();
+    } catch (error) {
+      logger.error('Error generating personal review:', error);
+      return 'Keep recording your reflections to unlock personalized insights about your journey.';
+    }
+  }
+
+  /**
+   * Main function: Analyze transcript and update activity tracker
+   * Implements the 3-step process
+   */
+  async analyzeAndTrackActivities(
+    audioLogId: string,
+    userId: string,
+    transcript: string,
+    title?: string
+  ): Promise<void> {
+    try {
+      const { ActivityTracker } = await import('../models/ActivityTracker');
+
+      // STEP 1: Extract activities from transcript
+      logger.info(`Step 1: Extracting activities from transcript for log ${audioLogId}`);
+      const extractedActivities = await this.extractActivities(transcript);
+
+      // Check if we got valid activities
+      if (extractedActivities.length === 1 && extractedActivities[0]?.activity === 'N/A') {
+        logger.debug('No activities detected in transcript');
+      }
+
+      // STEP 2: Classify activities into categories
+      logger.info(`Step 2: Classifying ${extractedActivities.length} activities`);
+      const { categoryPoints, classificationDetails } = await this.classifyActivities(extractedActivities);
+
+      // Find or create activity tracker for user
+      let tracker = await ActivityTracker.findOne({
+        userId: new mongoose.Types.ObjectId(userId)
+      });
+
+      if (!tracker) {
+        tracker = new ActivityTracker({
+          userId: new mongoose.Types.ObjectId(userId),
+          counts: { growth: 0, health: 0, work: 0, consumption: 0, other: 0 },
+          recentLogs: [],
+        });
+      }
+
+      // Add new log entry with full details
+      const logEntry = {
+        logId: new mongoose.Types.ObjectId(audioLogId),
+        title,
+        timestamp: new Date(),
+        extractedActivities,
+        classificationDetails,
+        categoryPoints,
+      };
+
+      // Add to recent logs (keep last 20)
+      tracker.recentLogs.push(logEntry);
+      if (tracker.recentLogs.length > 20) {
+        tracker.recentLogs = tracker.recentLogs.slice(-20);
+      }
+
+      // Recalculate total counts from all recent logs
+      const counts = { growth: 0, health: 0, work: 0, consumption: 0, other: 0 };
+      for (const log of tracker.recentLogs) {
+        if (log.categoryPoints) {
+          counts.growth += log.categoryPoints.growth || 0;
+          counts.health += log.categoryPoints.health || 0;
+          counts.work += log.categoryPoints.work || 0;
+          counts.consumption += log.categoryPoints.consumption || 0;
+          counts.other += log.categoryPoints.other || 0;
+        }
+      }
+      tracker.counts = counts;
+
+      await tracker.save();
+      logger.info(`Activity tracker updated for user ${userId}:`, counts);
+    } catch (error) {
+      logger.error('Error tracking activities:', error);
+      // Don't throw - activity tracking failure shouldn't break the main flow
+    }
+  }
+
+  /**
+   * Generate a fresh review based on activity patterns
+   * @param userId - User ID
+   */
+  async generateActivityReview(userId: string): Promise<string> {
+    try {
+      const { ActivityTracker } = await import('../models/ActivityTracker');
+
+      const tracker = await ActivityTracker.findOne({
+        userId: new mongoose.Types.ObjectId(userId)
+      });
+
+      if (!tracker || tracker.recentLogs.length === 0) {
+        return 'Start recording your daily reflections to get personalized insights about your life patterns and growth trajectory.';
+      }
+
+      // STEP 3: Generate personal review based on aggregated counts
+      logger.info(`Step 3: Generating personal review for user ${userId}`);
+      const review = await this.generatePersonalReview(tracker.counts);
+
+      // Update tracker with new review
+      tracker.lastReview = review;
+      tracker.lastReviewAt = new Date();
+      await tracker.save();
+
+      return review;
+    } catch (error) {
+      logger.error('Error generating activity review:', error);
+      return 'Keep recording your reflections to unlock personalized insights about your journey.';
+    }
+  }
+
+  /**
+   * Get activity summary for a user
+   * @param userId - User ID
+   */
+  async getActivitySummary(userId: string): Promise<{
+    counts: { growth: number; health: number; work: number; consumption: number; other: number };
+    recentLogs: {
+      title?: string;
+      timestamp: Date;
+      extractedActivities: { activity: string; context: string }[];
+      classificationDetails: { activity: string; category: string; points: number; reasoning: string }[];
+      categoryPoints: { growth: number; health: number; work: number; consumption: number; other: number };
+    }[];
+    review: string;
+    totalLogs: number;
+  } | null> {
+    try {
+      const { ActivityTracker } = await import('../models/ActivityTracker');
+
+      const tracker = await ActivityTracker.findOne({
+        userId: new mongoose.Types.ObjectId(userId)
+      });
+
+      if (!tracker) {
+        return null;
+      }
+
+      // Generate fresh review if needed (older than 1 hour or doesn't exist)
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      let review = tracker.lastReview || '';
+
+      if (!tracker.lastReview || !tracker.lastReviewAt || tracker.lastReviewAt < oneHourAgo) {
+        review = await this.generateActivityReview(userId);
+      }
+
+      return {
+        counts: tracker.counts,
+        recentLogs: tracker.recentLogs.map(log => ({
+          title: log.title,
+          timestamp: log.timestamp,
+          extractedActivities: log.extractedActivities || [],
+          classificationDetails: log.classificationDetails || [],
+          categoryPoints: log.categoryPoints || { growth: 0, health: 0, work: 0, consumption: 0, other: 0 },
+        })),
+        review,
+        totalLogs: tracker.recentLogs.length,
+      };
+    } catch (error) {
+      logger.error('Error getting activity summary:', error);
+      return null;
+    }
   }
 
   /**

@@ -142,4 +142,22 @@ export const getChatHistory = async (token: string, sessionId: string) => {
   });
 };
 
+/**
+ * Get activity summary (5 categories based on last 10 logs)
+ */
+export const getActivitySummary = async (token: string) => {
+  return api.get('/api/summary/activities', {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+};
+
+/**
+ * Generate fresh activity review
+ */
+export const generateActivityReview = async (token: string) => {
+  return api.post('/api/summary/activities/review', {}, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+};
+
 export default api;
