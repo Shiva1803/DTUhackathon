@@ -1,0 +1,48 @@
+═══════════════════════════════════════════════════════════
+VERCEL DEPLOYMENT SETTINGS - COPY & PASTE
+═══════════════════════════════════════════════════════════
+
+PROJECT SETTINGS:
+─────────────────────────────────────────────────────────
+Framework Preset: Vite
+Root Directory: frontend
+Production Branch: master
+Build Command: npm run build
+Output Directory: dist
+Install Command: npm install
+
+ENVIRONMENT VARIABLES (Add all 4):
+─────────────────────────────────────────────────────────
+
+1. VITE_API_URL
+   Value: http://YOUR_VULTR_SERVER_IP:3001
+   (Replace YOUR_VULTR_SERVER_IP with actual IP)
+   Example: http://45.76.123.456:3001
+
+2. VITE_AUTH0_DOMAIN
+   Value: dev-yx6bvvjlq1p3lwvi.us.auth0.com
+
+3. VITE_AUTH0_CLIENT_ID
+   Value: bBPurXakQQEKIRCL7WUnar0PfUrWqqnt
+
+4. VITE_AUTH0_AUDIENCE
+   Value: https://myapp/api
+
+═══════════════════════════════════════════════════════════
+IMPORTANT NOTES:
+═══════════════════════════════════════════════════════════
+✓ Branch MUST be "master" (not "main")
+✓ Root Directory MUST be "frontend"
+✓ Framework MUST be "Vite"
+✓ All env vars MUST start with "VITE_"
+✓ No trailing slash in VITE_API_URL
+
+═══════════════════════════════════════════════════════════
+AFTER DEPLOYMENT:
+═══════════════════════════════════════════════════════════
+1. Copy your Vercel URL (e.g., https://parallax-xyz.vercel.app)
+2. Update Auth0 callback URLs at https://manage.auth0.com
+3. Update backend CORS with your Vercel URL
+4. Test the app!
+
+═══════════════════════════════════════════════════════════
