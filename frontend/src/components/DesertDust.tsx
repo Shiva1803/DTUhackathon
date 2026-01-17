@@ -141,7 +141,7 @@ export default function DesertDust() {
       ))}
 
       {/* Larger dust clouds */}
-      {[...Array(8)].map((_, i) => (
+      {Array.from({ length: 8 }, (_, i) => (
         <motion.div
           key={`cloud-${i}`}
           className="absolute"
@@ -167,7 +167,7 @@ export default function DesertDust() {
       ))}
 
       {/* Dust devils / small swirls */}
-      {[...Array(4)].map((_, i) => (
+      {Array.from({ length: 4 }, (_, i) => (
         <motion.div
           key={`devil-${i}`}
           className="absolute"

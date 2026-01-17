@@ -349,9 +349,9 @@ export default function ChatPage() {
                     }}
                   >
                     <div className="flex gap-1">
-                      {[0, 1, 2].map(i => (
+                      {Array.from({ length: 3 }, (_, i) => (
                         <motion.div
-                          key={i}
+                          key={`dot-${i}`}
                           className="w-2 h-2 rounded-full"
                           style={{ background: isDark ? '#00d4ff' : '#8B6914' }}
                           animate={{ opacity: [0.3, 1, 0.3] }}
