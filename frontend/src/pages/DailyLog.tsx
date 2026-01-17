@@ -704,12 +704,12 @@ export default function DailyLog() {
                   }}
                 >
                   {/* Animated bars */}
-                  {[...Array(40)].map((_, i) => {
+                  {Array.from({ length: 40 }, (_, i) => {
                     const centerDistance = Math.abs(i - 20) / 20;
                     const baseHeight = 8 + (1 - centerDistance) * 20;
                     return (
                       <motion.div
-                        key={i}
+                        key={`bar-${i}`}
                         className="w-1 rounded-full"
                         style={{
                           background: isDark 

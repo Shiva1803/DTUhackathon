@@ -15,7 +15,7 @@ function BlackHoleLoader({ size = 'md' }: { size?: 'sm' | 'md' }) {
       }}
     >
       {/* Outer accretion disk rings */}
-      {[...Array(4)].map((_, i) => (
+      {Array.from({ length: 4 }, (_, i) => (
         <motion.div
           key={`ring-${i}`}
           className="absolute rounded-full"
@@ -45,7 +45,7 @@ function BlackHoleLoader({ size = 'md' }: { size?: 'sm' | 'md' }) {
       />
 
       {/* Swirling particles */}
-      {[...Array(12)].map((_, i) => {
+      {Array.from({ length: 12 }, (_, i) => {
         const angle = (i / 12) * Math.PI * 2;
         const radius = 45 + Math.random() * 20;
         return (

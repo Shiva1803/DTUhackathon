@@ -39,12 +39,12 @@ const sentimentColors: Record<string, string> = {
 // Theme-aware Preloader Component
 function ThemePreloader({ isDark }: { isDark: boolean }) {
   // Generate particles on each render to ensure they're theme-aware
-  const starParticles = [...Array(8)].map((_, i) => ({
+  const starParticles = Array.from({ length: 8 }, (_, i) => ({
     id: i,
     angle: i * 45,
   }));
   
-  const dustParticles = [...Array(12)].map((_, i) => ({
+  const dustParticles = Array.from({ length: 12 }, (_, i) => ({
     id: i,
     size: 3 + Math.random() * 4,
     opacity: 0.3 + Math.random() * 0.3,
@@ -349,9 +349,9 @@ function DeleteModal({
             {/* Animated particles on delete */}
             {isDeleting && (
               <>
-                {[...Array(8)].map((_, i) => (
+                {Array.from({ length: 8 }, (_, i) => (
                   <motion.div
-                    key={i}
+                    key={`particle-${i}`}
                     className="absolute w-2 h-2 rounded-full"
                     style={{
                       background: isDark ? '#f87171' : '#B85450',

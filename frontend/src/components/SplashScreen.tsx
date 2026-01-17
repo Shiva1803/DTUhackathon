@@ -38,7 +38,7 @@ function BlackHoleLoader() {
   return (
     <div className="relative w-64 h-64 flex items-center justify-center">
       {/* Outer accretion disk rings */}
-      {[...Array(5)].map((_, i) => (
+      {Array.from({ length: 5 }, (_, i) => (
         <motion.div
           key={`ring-${i}`}
           className="absolute rounded-full"
@@ -71,7 +71,7 @@ function BlackHoleLoader() {
       />
 
       {/* Swirling matter particles */}
-      {[...Array(20)].map((_, i) => {
+      {Array.from({ length: 20 }, (_, i) => {
         const angle = (i / 20) * Math.PI * 2;
         const radius = 60 + Math.random() * 30;
         return (
@@ -144,7 +144,7 @@ function BlackHoleLoader() {
       />
 
       {/* Light bending streaks */}
-      {[...Array(8)].map((_, i) => {
+      {Array.from({ length: 8 }, (_, i) => {
         const rotation = (i / 8) * 360;
         return (
           <motion.div
@@ -170,7 +170,7 @@ function BlackHoleLoader() {
       })}
 
       {/* Hawking radiation particles */}
-      {[...Array(12)].map((_, i) => (
+      {Array.from({ length: 12 }, (_, i) => (
         <motion.div
           key={`hawking-${i}`}
           className="absolute w-0.5 h-0.5 rounded-full bg-white"

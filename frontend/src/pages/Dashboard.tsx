@@ -359,7 +359,7 @@ export default function Dashboard() {
           />
           
           {/* Dust particles - darker brown */}
-          {[...Array(80)].map((_, i) => (
+          {Array.from({ length: 80 }, (_, i) => (
             <motion.div
               key={`dust-${i}`}
               className="absolute rounded-full"
@@ -386,7 +386,7 @@ export default function Dashboard() {
           ))}
           
           {/* Sand wisps - darker */}
-          {[...Array(15)].map((_, i) => (
+          {Array.from({ length: 15 }, (_, i) => (
             <motion.div
               key={`wisp-${i}`}
               className="absolute"
@@ -413,7 +413,7 @@ export default function Dashboard() {
           ))}
           
           {/* Larger dust clouds - darker brown */}
-          {[...Array(10)].map((_, i) => (
+          {Array.from({ length: 10 }, (_, i) => (
             <motion.div
               key={`cloud-${i}`}
               className="absolute"
@@ -439,7 +439,7 @@ export default function Dashboard() {
           ))}
           
           {/* Extra fine dust motes */}
-          {[...Array(50)].map((_, i) => (
+          {Array.from({ length: 50 }, (_, i) => (
             <motion.div
               key={`mote-${i}`}
               className="absolute rounded-full"

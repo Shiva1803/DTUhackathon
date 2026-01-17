@@ -185,9 +185,9 @@ export default function ChatWidget({ className = '' }: { className?: string }) {
                     style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
                   >
                     <div className="flex gap-1">
-                      {[0, 1, 2].map(i => (
+                      {Array.from({ length: 3 }, (_, i) => (
                         <motion.div
-                          key={i}
+                          key={`dot-${i}`}
                           className="w-1.5 h-1.5 rounded-full"
                           style={{ background: '#00d4ff' }}
                           animate={{ opacity: [0.3, 1, 0.3] }}
