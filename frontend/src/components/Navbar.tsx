@@ -16,8 +16,6 @@ export default function Navbar() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  if (!isAuthenticated) return null;
-
   const handleLogout = () => {
     logout({
       logoutParams: {
@@ -38,6 +36,11 @@ export default function Navbar() {
     { path: '/summary', icon: BarChart3, label: 'Summary' },
     { path: '/chat', icon: MessageSquare, label: 'Coach' },
   ];
+
+  // Early return must be after all hooks are called to avoid React #310 error
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <>
