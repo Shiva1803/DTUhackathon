@@ -83,7 +83,10 @@ export default function ChatWidget({ className = '' }: { className?: string }) {
     }
   };
 
-  if (!isAuthenticated) return null;
+  // Early return must be after all hooks are called to avoid React #310 error
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className={`fixed bottom-6 right-6 z-50 ${className}`}>
