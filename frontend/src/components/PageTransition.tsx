@@ -1,5 +1,15 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Pre-computed particle data for BlackHoleLoader
+const pageTransitionParticles = Array.from({ length: 12 }, (_, i) => {
+  const angle = (i / 12) * Math.PI * 2;
+  const radiusOffsets = [0.35, 0.82, 0.19, 0.67, 0.41, 0.93, 0.28, 0.56, 0.74, 0.11, 0.88, 0.49];
+  const durationOffsets = [0.22, 0.65, 0.38, 0.91, 0.14, 0.77, 0.43, 0.06, 0.59, 0.84, 0.31, 0.68];
+  const radius = 45 + radiusOffsets[i] * 20;
+  const duration = 1.5 + durationOffsets[i] * 0.5;
+  return { angle, radius, duration };
+});
+
 // Black Hole Loader Component (reused from splash)
 function BlackHoleLoader({ size = 'md' }: { size?: 'sm' | 'md' }) {
   const scale = size === 'sm' ? 0.5 : 0.7;
@@ -45,24 +55,20 @@ function BlackHoleLoader({ size = 'md' }: { size?: 'sm' | 'md' }) {
       />
 
       {/* Swirling particles */}
-      {Array.from({ length: 12 }, (_, i) => {
-        const angle = (i / 12) * Math.PI * 2;
-        const radius = 45 + Math.random() * 20;
-        return (
-          <motion.div
-            key={`particle-${i}`}
-            className="absolute w-1 h-1 rounded-full"
-            style={{ backgroundColor: '#00d4ff', boxShadow: '0 0 4px rgba(0,212,255,0.6)' }}
-            animate={{
-              x: [Math.cos(angle) * radius, Math.cos(angle + Math.PI) * (radius * 0.2), Math.cos(angle) * radius],
-              y: [Math.sin(angle) * radius, Math.sin(angle + Math.PI) * (radius * 0.2), Math.sin(angle) * radius],
-              scale: [1, 0.3, 1],
-              opacity: [0.8, 0.2, 0.8],
-            }}
-            transition={{ duration: 1.5 + Math.random() * 0.5, repeat: Infinity, ease: 'easeInOut', delay: i * 0.08 }}
-          />
-        );
-      })}
+      {pageTransitionParticles.map((particle, i) => (
+        <motion.div
+          key={`particle-${i}`}
+          className="absolute w-1 h-1 rounded-full"
+          style={{ backgroundColor: '#00d4ff', boxShadow: '0 0 4px rgba(0,212,255,0.6)' }}
+          animate={{
+            x: [Math.cos(particle.angle) * particle.radius, Math.cos(particle.angle + Math.PI) * (particle.radius * 0.2), Math.cos(particle.angle) * particle.radius],
+            y: [Math.sin(particle.angle) * particle.radius, Math.sin(particle.angle + Math.PI) * (particle.radius * 0.2), Math.sin(particle.angle) * particle.radius],
+            scale: [1, 0.3, 1],
+            opacity: [0.8, 0.2, 0.8],
+          }}
+          transition={{ duration: particle.duration, repeat: Infinity, ease: 'easeInOut', delay: i * 0.08 }}
+        />
+      ))}
 
       {/* Event horizon */}
       <motion.div

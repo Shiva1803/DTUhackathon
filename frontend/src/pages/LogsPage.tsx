@@ -36,22 +36,29 @@ const sentimentColors: Record<string, string> = {
   neutral: 'text-gray-400', mixed: 'text-amber-400',
 };
 
+// Pre-computed dust particles for ThemePreloader
+const preloaderDustParticles = Array.from({ length: 12 }, (_, i) => {
+  const seeds = [0.35, 0.82, 0.19, 0.67, 0.41, 0.93, 0.28, 0.56, 0.74, 0.11, 0.88, 0.49];
+  const seeds2 = [0.22, 0.65, 0.38, 0.91, 0.14, 0.77, 0.43, 0.06, 0.59, 0.84, 0.31, 0.68];
+  const seeds3 = [0.45, 0.12, 0.78, 0.33, 0.89, 0.56, 0.01, 0.67, 0.23, 0.94, 0.48, 0.17];
+  const seeds4 = [0.61, 0.29, 0.85, 0.42, 0.07, 0.73, 0.38, 0.91, 0.16, 0.54, 0.82, 0.25];
+  return {
+    id: i,
+    size: 3 + seeds[i] * 4,
+    opacity: 0.3 + seeds2[i] * 0.3,
+    xOffset: (seeds3[i] - 0.5) * 100,
+    yOffset: (seeds4[i] - 0.5) * 100,
+    delay: i * 0.15,
+    duration: 2 + seeds[i],
+  };
+});
+
 // Theme-aware Preloader Component
 function ThemePreloader({ isDark }: { isDark: boolean }) {
   // Generate particles on each render to ensure they're theme-aware
   const starParticles = Array.from({ length: 8 }, (_, i) => ({
     id: i,
     angle: i * 45,
-  }));
-  
-  const dustParticles = Array.from({ length: 12 }, (_, i) => ({
-    id: i,
-    size: 3 + Math.random() * 4,
-    opacity: 0.3 + Math.random() * 0.3,
-    xOffset: (Math.random() - 0.5) * 100,
-    yOffset: (Math.random() - 0.5) * 100,
-    delay: i * 0.15,
-    duration: 2 + Math.random(),
   }));
 
   return (
@@ -145,7 +152,7 @@ function ThemePreloader({ isDark }: { isDark: boolean }) {
           ))
         ) : (
           // Light mode: Brown dust particles
-          dustParticles.map((particle) => (
+          preloaderDustParticles.map((particle) => (
             <motion.div
               key={`dust-${particle.id}`}
               className="absolute rounded-full"

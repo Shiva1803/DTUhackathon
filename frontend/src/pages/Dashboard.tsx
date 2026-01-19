@@ -22,6 +22,76 @@ const generateStars = (count: number) => {
 
 const stars = generateStars(100);
 
+// Pre-generated desert theme particles
+const desertDustParticles = Array.from({ length: 80 }, (_, i) => {
+  // Pre-computed pseudo-random values
+  const seed1 = ((i * 7919) % 100) / 100;
+  const seed2 = ((i * 104729) % 100) / 100;
+  const seed3 = ((i * 13) % 100) / 100;
+  const seed4 = ((i * 31) % 100) / 100;
+  const seed5 = ((i * 47) % 100) / 100;
+  const seed6 = ((i * 59) % 100) / 100;
+  const seed7 = ((i * 71) % 100) / 100;
+  const seed8 = ((i * 83) % 100) / 100;
+  return {
+    id: i,
+    left: -10 - seed1 * 20,
+    top: seed2 * 100,
+    width: seed3 * 5 + 2,
+    height: seed4 * 5 + 2,
+    bgOpacity: seed5 * 0.5 + 0.2,
+    boxShadowSize: seed6 * 6 + 3,
+    yMid1: seed7 * 40 - 20,
+    yMid2: seed8 * -40 + 20,
+    duration: 6 + seed1 * 10,
+    delay: seed2 * 8,
+  };
+});
+
+const desertWisps = Array.from({ length: 15 }, (_, i) => {
+  const seed1 = ((i * 7919) % 100) / 100;
+  const seed2 = ((i * 104729) % 100) / 100;
+  const seed3 = ((i * 13) % 100) / 100;
+  const seed4 = ((i * 31) % 100) / 100;
+  return {
+    id: i,
+    top: 10 + seed1 * 80,
+    width: 80 + seed2 * 250,
+    height: 2 + seed3 * 3,
+    duration: 5 + seed4 * 7,
+    delay: seed1 * 6,
+  };
+});
+
+const desertClouds = Array.from({ length: 10 }, (_, i) => {
+  const seed1 = ((i * 7919) % 100) / 100;
+  const seed2 = ((i * 104729) % 100) / 100;
+  return {
+    id: i,
+    width: 200 + seed1 * 200,
+    height: 50 + seed2 * 50,
+  };
+});
+
+const desertMotes = Array.from({ length: 50 }, (_, i) => {
+  const seed1 = ((i * 7919) % 100) / 100;
+  const seed2 = ((i * 104729) % 100) / 100;
+  const seed3 = ((i * 13) % 100) / 100;
+  const seed4 = ((i * 31) % 100) / 100;
+  const seed5 = ((i * 47) % 100) / 100;
+  const seed6 = ((i * 59) % 100) / 100;
+  return {
+    id: i,
+    left: seed1 * 100,
+    top: seed2 * 100,
+    width: seed3 * 3 + 1,
+    height: seed4 * 3 + 1,
+    bgOpacity: seed5 * 0.4 + 0.15,
+    duration: 12 + seed6 * 15,
+    delay: seed1 * 10,
+  };
+});
+
 // Navigation card with flicker effect
 interface NavCardProps {
   path: string;
@@ -359,26 +429,26 @@ export default function Dashboard() {
           />
           
           {/* Dust particles - darker brown */}
-          {Array.from({ length: 80 }, (_, i) => (
+          {desertDustParticles.map((particle) => (
             <motion.div
-              key={`dust-${i}`}
+              key={`dust-${particle.id}`}
               className="absolute rounded-full"
               style={{
-                left: `${-10 - Math.random() * 20}%`,
-                top: `${Math.random() * 100}%`,
-                width: Math.random() * 5 + 2,
-                height: Math.random() * 5 + 2,
-                background: `rgba(101, 67, 33, ${Math.random() * 0.5 + 0.2})`,
-                boxShadow: `0 0 ${Math.random() * 6 + 3}px rgba(101, 67, 33, 0.4)`,
+                left: `${particle.left}%`,
+                top: `${particle.top}%`,
+                width: particle.width,
+                height: particle.height,
+                background: `rgba(101, 67, 33, ${particle.bgOpacity})`,
+                boxShadow: `0 0 ${particle.boxShadowSize}px rgba(101, 67, 33, 0.4)`,
               }}
               animate={{
                 x: ['0vw', '120vw'],
-                y: [0, Math.random() * 40 - 20, Math.random() * -40 + 20, 0],
+                y: [0, particle.yMid1, particle.yMid2, 0],
                 opacity: [0, 0.6, 0.5, 0],
               }}
               transition={{
-                duration: 6 + Math.random() * 10,
-                delay: Math.random() * 8,
+                duration: particle.duration,
+                delay: particle.delay,
                 repeat: Infinity,
                 ease: 'linear',
               }}
@@ -386,15 +456,15 @@ export default function Dashboard() {
           ))}
           
           {/* Sand wisps - darker */}
-          {Array.from({ length: 15 }, (_, i) => (
+          {desertWisps.map((wisp) => (
             <motion.div
-              key={`wisp-${i}`}
+              key={`wisp-${wisp.id}`}
               className="absolute"
               style={{
-                top: `${10 + Math.random() * 80}%`,
+                top: `${wisp.top}%`,
                 left: '-20%',
-                width: 80 + Math.random() * 250,
-                height: 2 + Math.random() * 3,
+                width: wisp.width,
+                height: wisp.height,
                 background: 'linear-gradient(90deg, transparent, rgba(139, 90, 43, 0.4), rgba(101, 67, 33, 0.3), transparent)',
                 filter: 'blur(2px)',
                 borderRadius: '50%',
@@ -404,8 +474,8 @@ export default function Dashboard() {
                 opacity: [0, 0.7, 0.5, 0],
               }}
               transition={{
-                duration: 5 + Math.random() * 7,
-                delay: Math.random() * 6,
+                duration: wisp.duration,
+                delay: wisp.delay,
                 repeat: Infinity,
                 ease: 'easeInOut',
               }}
@@ -413,15 +483,15 @@ export default function Dashboard() {
           ))}
           
           {/* Larger dust clouds - darker brown */}
-          {Array.from({ length: 10 }, (_, i) => (
+          {desertClouds.map((cloud) => (
             <motion.div
-              key={`cloud-${i}`}
+              key={`cloud-${cloud.id}`}
               className="absolute"
               style={{
-                top: `${10 + i * 9}%`,
+                top: `${10 + cloud.id * 9}%`,
                 left: '-30%',
-                width: 200 + Math.random() * 200,
-                height: 50 + Math.random() * 50,
+                width: cloud.width,
+                height: cloud.height,
                 background: 'radial-gradient(ellipse, rgba(139, 90, 43, 0.15) 0%, transparent 70%)',
                 filter: 'blur(12px)',
                 borderRadius: '50%',
@@ -430,8 +500,8 @@ export default function Dashboard() {
                 x: ['0vw', '160vw'],
               }}
               transition={{
-                duration: 15 + i * 3,
-                delay: i * 2,
+                duration: 15 + cloud.id * 3,
+                delay: cloud.id * 2,
                 repeat: Infinity,
                 ease: 'linear',
               }}
@@ -439,16 +509,16 @@ export default function Dashboard() {
           ))}
           
           {/* Extra fine dust motes */}
-          {Array.from({ length: 50 }, (_, i) => (
+          {desertMotes.map((mote) => (
             <motion.div
-              key={`mote-${i}`}
+              key={`mote-${mote.id}`}
               className="absolute rounded-full"
               style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                width: Math.random() * 3 + 1,
-                height: Math.random() * 3 + 1,
-                background: `rgba(120, 80, 40, ${Math.random() * 0.4 + 0.15})`,
+                left: `${mote.left}%`,
+                top: `${mote.top}%`,
+                width: mote.width,
+                height: mote.height,
+                background: `rgba(120, 80, 40, ${mote.bgOpacity})`,
               }}
               animate={{
                 x: [0, 40, -30, 50, 0],
@@ -456,8 +526,8 @@ export default function Dashboard() {
                 opacity: [0.2, 0.5, 0.3, 0.4, 0.2],
               }}
               transition={{
-                duration: 12 + Math.random() * 15,
-                delay: Math.random() * 10,
+                duration: mote.duration,
+                delay: mote.delay,
                 repeat: Infinity,
                 ease: 'easeInOut',
               }}

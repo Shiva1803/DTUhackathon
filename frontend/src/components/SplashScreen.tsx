@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, MotionValue } from 'framer-motion';
 
 // Generate random stars with depth layers
 const generateStars = (count: number) => {
@@ -29,9 +29,73 @@ const generateShootingStars = (count: number) => {
 const stars = generateStars(250);
 const shootingStars = generateShootingStars(4);
 
+// Component for parallax stars - hooks called at component level
+function ParallaxStar({ 
+  star, 
+  smoothMouseX, 
+  smoothMouseY 
+}: { 
+  star: typeof stars[0]; 
+  smoothMouseX: MotionValue<number>; 
+  smoothMouseY: MotionValue<number>;
+}) {
+  const parallaxStrength = 15 + star.depth * 35;
+  const x = useTransform(smoothMouseX, [-1, 1], [parallaxStrength, -parallaxStrength]);
+  const y = useTransform(smoothMouseY, [-1, 1], [parallaxStrength, -parallaxStrength]);
+  
+  return (
+    <motion.div
+      className="absolute rounded-full"
+      style={{
+        left: `${star.x}%`,
+        top: `${star.y}%`,
+        width: star.size,
+        height: star.size,
+        backgroundColor: '#ffffff',
+        boxShadow: star.size > 1.5 
+          ? `0 0 ${star.size * 2}px ${star.size * 0.5}px rgba(255,255,255,0.3)` 
+          : 'none',
+        x,
+        y,
+      }}
+      initial={{ opacity: 0 }}
+      animate={{
+        opacity: [0, star.opacity, star.opacity * 0.3, star.opacity],
+      }}
+      transition={{
+        duration: star.duration,
+        delay: star.delay,
+        repeat: Infinity,
+        ease: 'easeInOut',
+      }}
+    />
+  );
+}
+
 interface SplashScreenProps {
   onComplete?: () => void;
 }
+
+// Pre-computed particle data for BlackHoleLoader
+const swirlingParticles = Array.from({ length: 20 }, (_, i) => {
+  const angle = (i / 20) * Math.PI * 2;
+  const radiusOffset = [0.23, 0.67, 0.45, 0.89, 0.12, 0.56, 0.78, 0.34, 0.91, 0.02, 0.65, 0.38, 0.71, 0.19, 0.84, 0.47, 0.93, 0.26, 0.58, 0.11][i];
+  const durationOffset = [0.45, 0.23, 0.78, 0.12, 0.67, 0.34, 0.89, 0.56, 0.01, 0.93, 0.28, 0.61, 0.15, 0.82, 0.49, 0.06, 0.73, 0.37, 0.94, 0.52][i];
+  const radius = 60 + radiusOffset * 30;
+  return { angle, radius, duration: 2 + durationOffset };
+});
+
+const hawkingParticles = Array.from({ length: 12 }, (_, i) => {
+  const offsets = [
+    { x: 0.32, y: 0.78 }, { x: 0.91, y: 0.15 }, { x: 0.45, y: 0.62 }, { x: 0.08, y: 0.39 },
+    { x: 0.73, y: 0.84 }, { x: 0.26, y: 0.51 }, { x: 0.89, y: 0.03 }, { x: 0.14, y: 0.67 },
+    { x: 0.58, y: 0.29 }, { x: 0.02, y: 0.95 }, { x: 0.41, y: 0.18 }, { x: 0.76, y: 0.53 }
+  ];
+  return {
+    xTarget: (offsets[i].x - 0.5) * 150,
+    yTarget: (offsets[i].y - 0.5) * 150,
+  };
+});
 
 // Black Hole Loader Component
 function BlackHoleLoader() {
@@ -71,40 +135,36 @@ function BlackHoleLoader() {
       />
 
       {/* Swirling matter particles */}
-      {Array.from({ length: 20 }, (_, i) => {
-        const angle = (i / 20) * Math.PI * 2;
-        const radius = 60 + Math.random() * 30;
-        return (
-          <motion.div
-            key={`particle-${i}`}
-            className="absolute w-1 h-1 rounded-full"
-            style={{
-              backgroundColor: '#00d4ff',
-              boxShadow: '0 0 4px 1px rgba(0,212,255,0.6)',
-            }}
-            animate={{
-              x: [
-                Math.cos(angle) * radius,
-                Math.cos(angle + Math.PI) * (radius * 0.3),
-                Math.cos(angle) * radius,
-              ],
-              y: [
-                Math.sin(angle) * radius,
-                Math.sin(angle + Math.PI) * (radius * 0.3),
-                Math.sin(angle) * radius,
-              ],
-              scale: [1, 0.3, 1],
-              opacity: [0.8, 0.2, 0.8],
-            }}
-            transition={{
-              duration: 2 + Math.random(),
-              repeat: Infinity,
-              ease: 'easeInOut',
-              delay: i * 0.1,
-            }}
-          />
-        );
-      })}
+      {swirlingParticles.map((particle, i) => (
+        <motion.div
+          key={`particle-${i}`}
+          className="absolute w-1 h-1 rounded-full"
+          style={{
+            backgroundColor: '#00d4ff',
+            boxShadow: '0 0 4px 1px rgba(0,212,255,0.6)',
+          }}
+          animate={{
+            x: [
+              Math.cos(particle.angle) * particle.radius,
+              Math.cos(particle.angle + Math.PI) * (particle.radius * 0.3),
+              Math.cos(particle.angle) * particle.radius,
+            ],
+            y: [
+              Math.sin(particle.angle) * particle.radius,
+              Math.sin(particle.angle + Math.PI) * (particle.radius * 0.3),
+              Math.sin(particle.angle) * particle.radius,
+            ],
+            scale: [1, 0.3, 1],
+            opacity: [0.8, 0.2, 0.8],
+          }}
+          transition={{
+            duration: particle.duration,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: i * 0.1,
+          }}
+        />
+      ))}
 
       {/* Event horizon - the black center */}
       <motion.div
@@ -170,15 +230,15 @@ function BlackHoleLoader() {
       })}
 
       {/* Hawking radiation particles */}
-      {Array.from({ length: 12 }, (_, i) => (
+      {hawkingParticles.map((particle, i) => (
         <motion.div
           key={`hawking-${i}`}
           className="absolute w-0.5 h-0.5 rounded-full bg-white"
           style={{ boxShadow: '0 0 3px 1px rgba(0,212,255,0.5)' }}
           initial={{ x: 0, y: 0, opacity: 0 }}
           animate={{
-            x: [0, (Math.random() - 0.5) * 150],
-            y: [0, (Math.random() - 0.5) * 150],
+            x: [0, particle.xTarget],
+            y: [0, particle.yTarget],
             opacity: [0, 1, 0],
           }}
           transition={{
@@ -207,6 +267,12 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
   const springConfig = { damping: 25, stiffness: 150 };
   const smoothMouseX = useSpring(mouseX, springConfig);
   const smoothMouseY = useSpring(mouseY, springConfig);
+
+  // Pre-compute useTransform calls at component level (not in render callbacks)
+  const nebulaX1 = useTransform(smoothMouseX, [-1, 1], [20, -20]);
+  const nebulaY1 = useTransform(smoothMouseY, [-1, 1], [20, -20]);
+  const nebulaX2 = useTransform(smoothMouseX, [-1, 1], [-15, 15]);
+  const nebulaY2 = useTransform(smoothMouseY, [-1, 1], [-15, 15]);
 
   // Handle mouse move for parallax effect
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -251,28 +317,28 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
 
   return (
     <AnimatePresence>
-      {phase !== 'exit' || true ? (
-        <motion.div
-          ref={containerRef}
-          initial={{ opacity: 1 }}
-          animate={{ opacity: phase === 'exit' ? 0 : 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden cursor-default"
-          style={{ background: '#000000' }}
-          onMouseMove={handleMouseMove}
-          onAnimationComplete={() => {
-            if (phase === 'exit') onComplete?.();
-          }}
-        >
-          {/* Nebula accents */}
-          <div className="absolute inset-0 pointer-events-none">
+      {/* Always render during splash/loading/exit for smooth animation */}
+      <motion.div
+        ref={containerRef}
+        initial={{ opacity: 1 }}
+        animate={{ opacity: phase === 'exit' ? 0 : 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden cursor-default"
+        style={{ background: '#000000' }}
+        onMouseMove={handleMouseMove}
+        onAnimationComplete={() => {
+          if (phase === 'exit') onComplete?.();
+        }}
+      >
+        {/* Nebula accents */}
+        <div className="absolute inset-0 pointer-events-none">
             <motion.div
               className="absolute inset-0"
               style={{
                 background: 'radial-gradient(ellipse at 15% 85%, rgba(0, 60, 80, 0.3) 0%, transparent 50%)',
-                x: useTransform(smoothMouseX, [-1, 1], [20, -20]),
-                y: useTransform(smoothMouseY, [-1, 1], [20, -20]),
+                x: nebulaX1,
+                y: nebulaY1,
               }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.25 }}
@@ -282,8 +348,8 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
               className="absolute inset-0"
               style={{
                 background: 'radial-gradient(ellipse at 85% 15%, rgba(0, 100, 120, 0.2) 0%, transparent 50%)',
-                x: useTransform(smoothMouseX, [-1, 1], [-15, 15]),
-                y: useTransform(smoothMouseY, [-1, 1], [-15, 15]),
+                x: nebulaX2,
+                y: nebulaY2,
               }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.2 }}
@@ -293,37 +359,14 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
 
           {/* Parallax star field */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {stars.map((star) => {
-              const parallaxStrength = 15 + star.depth * 35; // 15-50px movement based on depth
-              return (
-                <motion.div
-                  key={star.id}
-                  className="absolute rounded-full"
-                  style={{
-                    left: `${star.x}%`,
-                    top: `${star.y}%`,
-                    width: star.size,
-                    height: star.size,
-                    backgroundColor: '#ffffff',
-                    boxShadow: star.size > 1.5 
-                      ? `0 0 ${star.size * 2}px ${star.size * 0.5}px rgba(255,255,255,0.3)` 
-                      : 'none',
-                    x: useTransform(smoothMouseX, [-1, 1], [parallaxStrength, -parallaxStrength]),
-                    y: useTransform(smoothMouseY, [-1, 1], [parallaxStrength, -parallaxStrength]),
-                  }}
-                  initial={{ opacity: 0 }}
-                  animate={{
-                    opacity: [0, star.opacity, star.opacity * 0.3, star.opacity],
-                  }}
-                  transition={{
-                    duration: star.duration,
-                    delay: star.delay,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                  }}
-                />
-              );
-            })}
+            {stars.map((star) => (
+              <ParallaxStar 
+                key={star.id} 
+                star={star} 
+                smoothMouseX={smoothMouseX} 
+                smoothMouseY={smoothMouseY} 
+              />
+            ))}
           </div>
 
           {/* Shooting stars */}
@@ -645,7 +688,6 @@ export default function SplashScreen({ onComplete }: SplashScreenProps) {
             transition={{ duration: 2, delay: 1 }}
           />
         </motion.div>
-      ) : null}
     </AnimatePresence>
   );
 }
