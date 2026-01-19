@@ -16,19 +16,27 @@ const ThemeContext = createContext<ThemeContextType>({
   isLoaded: false,
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTheme = () => useContext(ThemeContext);
 
+// Helper to get initial theme from localStorage
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'dark';
+  const saved = localStorage.getItem('parallax-theme');
+  if (saved === 'light' || saved === 'dark') {
+    return saved;
+  }
+  return 'dark';
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load theme from localStorage on mount
+  // Mark as loaded on mount
   useEffect(() => {
-    const saved = localStorage.getItem('parallax-theme') as Theme | null;
-    if (saved === 'light' || saved === 'dark') {
-      setTheme(saved);
-    }
-    setIsLoaded(true);
+    // Use queueMicrotask to avoid synchronous state update during effect
+    queueMicrotask(() => setIsLoaded(true));
   }, []);
 
   useEffect(() => {

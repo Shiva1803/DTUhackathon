@@ -80,7 +80,7 @@ export default function ShareCard({
                         text: `I'm in my ${phase} phase! Check out my weekly growth summary.`,
                         files: [file],
                     });
-                } catch (shareError) {
+                } catch {
                     // User cancelled or share failed, fallback to download
                     handleDownload();
                 }

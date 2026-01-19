@@ -40,6 +40,17 @@ const generateDustMotes = (count: number) => {
   }));
 };
 
+// Pre-generate dust cloud dimensions
+const dustClouds = Array.from({ length: 8 }, (_, i) => {
+  const widthOffsets = [0.35, 0.82, 0.19, 0.67, 0.41, 0.93, 0.28, 0.56];
+  const heightOffsets = [0.22, 0.65, 0.38, 0.91, 0.14, 0.77, 0.43, 0.06];
+  return {
+    id: i,
+    width: 300 + widthOffsets[i] * 200,
+    height: 80 + heightOffsets[i] * 60,
+  };
+});
+
 const dustParticles = generateDustParticles(50);
 const sandWisps = generateSandWisps(12);
 const dustMotes = generateDustMotes(30);
@@ -141,15 +152,15 @@ export default function DesertDust() {
       ))}
 
       {/* Larger dust clouds */}
-      {Array.from({ length: 8 }, (_, i) => (
+      {dustClouds.map((cloud) => (
         <motion.div
-          key={`cloud-${i}`}
+          key={`cloud-${cloud.id}`}
           className="absolute"
           style={{
-            top: `${15 + i * 10}%`,
+            top: `${15 + cloud.id * 10}%`,
             left: '-30%',
-            width: 300 + Math.random() * 200,
-            height: 80 + Math.random() * 60,
+            width: cloud.width,
+            height: cloud.height,
             background: 'radial-gradient(ellipse, rgba(210, 180, 140, 0.15) 0%, transparent 70%)',
             filter: 'blur(20px)',
             borderRadius: '50%',
@@ -158,8 +169,8 @@ export default function DesertDust() {
             x: ['0vw', '160vw'],
           }}
           transition={{
-            duration: 18 + i * 4,
-            delay: i * 3,
+            duration: 18 + cloud.id * 4,
+            delay: cloud.id * 3,
             repeat: Infinity,
             ease: 'linear',
           }}

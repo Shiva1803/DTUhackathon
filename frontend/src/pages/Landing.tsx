@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { motion, useMotionValue, useSpring, useTransform, MotionValue } from 'framer-motion';
 import { Mic, Brain, LineChart, Loader2, ArrowRight, Zap } from 'lucide-react';
 
 // Generate stars for background
@@ -19,6 +19,38 @@ const generateStars = (count: number) => {
 };
 
 const stars = generateStars(150);
+
+// Component for parallax stars - hooks called at component level
+function ParallaxStar({ 
+  star, 
+  smoothMouseX, 
+  smoothMouseY 
+}: { 
+  star: typeof stars[0]; 
+  smoothMouseX: MotionValue<number>; 
+  smoothMouseY: MotionValue<number>;
+}) {
+  const parallaxStrength = 10 + star.depth * 25;
+  const x = useTransform(smoothMouseX, [-1, 1], [parallaxStrength, -parallaxStrength]);
+  const y = useTransform(smoothMouseY, [-1, 1], [parallaxStrength, -parallaxStrength]);
+  
+  return (
+    <motion.div
+      className="absolute rounded-full bg-white"
+      style={{
+        left: `${star.x}%`,
+        top: `${star.y}%`,
+        width: star.size,
+        height: star.size,
+        x,
+        y,
+        boxShadow: star.size > 1.5 ? `0 0 ${star.size * 2}px rgba(255,255,255,0.3)` : 'none',
+      }}
+      animate={{ opacity: [star.opacity * 0.3, star.opacity, star.opacity * 0.3] }}
+      transition={{ duration: star.duration, repeat: Infinity, delay: star.delay }}
+    />
+  );
+}
 
 const steps = [
   {
@@ -51,6 +83,12 @@ export default function Landing() {
   const springConfig = { damping: 30, stiffness: 150 };
   const smoothMouseX = useSpring(mouseX, springConfig);
   const smoothMouseY = useSpring(mouseY, springConfig);
+
+  // Pre-compute useTransform calls at component level
+  const ambientX1 = useTransform(smoothMouseX, [-1, 1], [30, -30]);
+  const ambientY1 = useTransform(smoothMouseY, [-1, 1], [30, -30]);
+  const ambientX2 = useTransform(smoothMouseX, [-1, 1], [-20, 20]);
+  const ambientY2 = useTransform(smoothMouseY, [-1, 1], [-20, 20]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
@@ -96,26 +134,14 @@ export default function Landing() {
     >
       {/* Animated star field */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {stars.map((star) => {
-          const parallaxStrength = 10 + star.depth * 25;
-          return (
-            <motion.div
-              key={star.id}
-              className="absolute rounded-full bg-white"
-              style={{
-                left: `${star.x}%`,
-                top: `${star.y}%`,
-                width: star.size,
-                height: star.size,
-                x: useTransform(smoothMouseX, [-1, 1], [parallaxStrength, -parallaxStrength]),
-                y: useTransform(smoothMouseY, [-1, 1], [parallaxStrength, -parallaxStrength]),
-                boxShadow: star.size > 1.5 ? `0 0 ${star.size * 2}px rgba(255,255,255,0.3)` : 'none',
-              }}
-              animate={{ opacity: [star.opacity * 0.3, star.opacity, star.opacity * 0.3] }}
-              transition={{ duration: star.duration, repeat: Infinity, delay: star.delay }}
-            />
-          );
-        })}
+        {stars.map((star) => (
+          <ParallaxStar 
+            key={star.id} 
+            star={star} 
+            smoothMouseX={smoothMouseX} 
+            smoothMouseY={smoothMouseY} 
+          />
+        ))}
       </div>
 
       {/* Ambient gradients */}
@@ -124,16 +150,16 @@ export default function Landing() {
           className="absolute inset-0"
           style={{
             background: 'radial-gradient(ellipse at 20% 80%, rgba(0, 60, 80, 0.2) 0%, transparent 50%)',
-            x: useTransform(smoothMouseX, [-1, 1], [30, -30]),
-            y: useTransform(smoothMouseY, [-1, 1], [30, -30]),
+            x: ambientX1,
+            y: ambientY1,
           }}
         />
         <motion.div
           className="absolute inset-0"
           style={{
             background: 'radial-gradient(ellipse at 80% 20%, rgba(0, 100, 120, 0.15) 0%, transparent 50%)',
-            x: useTransform(smoothMouseX, [-1, 1], [-20, 20]),
-            y: useTransform(smoothMouseY, [-1, 1], [-20, 20]),
+            x: ambientX2,
+            y: ambientY2,
           }}
         />
       </div>

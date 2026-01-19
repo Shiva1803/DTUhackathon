@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useRef, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Auth0Provider, AppState } from '@auth0/auth0-react';
 import { Landing, Dashboard, DailyLog, Success, SummaryPage, LogsPage, ChatPage } from './pages';
@@ -30,32 +30,35 @@ const PageTransitionContext = createContext<PageTransitionContextType>({
   startTransition: () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const usePageTransition = () => useContext(PageTransitionContext);
 
 // Page transition provider
 function PageTransitionProvider({ children }: { children: React.ReactNode }) {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const location = useLocation();
-  const [prevPath, setPrevPath] = useState(location.pathname);
+  const prevPathRef = useRef(location.pathname);
 
   // Protected routes that should show transition
-  const protectedPaths = ['/dashboard', '/log', '/logs', '/summary', '/chat', '/success'];
+  const protectedPaths = useMemo(() => ['/dashboard', '/log', '/logs', '/summary', '/chat', '/success'], []);
 
   useEffect(() => {
     const currentPath = location.pathname;
+    const prevPath = prevPathRef.current;
     const wasProtected = protectedPaths.some(p => prevPath.startsWith(p));
     const isProtected = protectedPaths.some(p => currentPath.startsWith(p));
 
     // Show transition when navigating between protected routes
     if (wasProtected && isProtected && prevPath !== currentPath) {
-      setIsTransitioning(true);
+      // Use queueMicrotask to avoid synchronous state update during effect
+      queueMicrotask(() => setIsTransitioning(true));
       const timer = setTimeout(() => setIsTransitioning(false), 800);
-      setPrevPath(currentPath);
+      prevPathRef.current = currentPath;
       return () => clearTimeout(timer);
     }
     
-    setPrevPath(currentPath);
-  }, [location.pathname]);
+    prevPathRef.current = currentPath;
+  }, [location.pathname, protectedPaths]);
 
   const startTransition = (callback: () => void) => {
     setIsTransitioning(true);

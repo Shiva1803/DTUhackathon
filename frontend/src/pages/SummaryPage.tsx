@@ -172,7 +172,7 @@ function RecentActivityLog({ log, isDark, index }: { log: RecentLog; isDark: boo
   }, { growth: 0, health: 0, work: 0, consumption: 0, other: 0 });
 
   const nonZeroCategories = Object.entries(pointsSummary)
-    .filter(([_, points]) => points !== 0)
+    .filter(([, points]) => points !== 0)
     .slice(0, 3);
 
   return (

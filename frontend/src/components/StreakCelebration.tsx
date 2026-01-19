@@ -13,11 +13,13 @@ interface StreakCelebrationProps {
  * Triggers on: 7-day streak, 14-day streak, 30-day streak, etc.
  */
 export default function StreakCelebration({ streak, onClose }: StreakCelebrationProps) {
-    const [showCelebration, setShowCelebration] = useState(false);
     const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
     // Milestones that trigger celebration
     const isMilestone = streak > 0 && (streak === 7 || streak === 14 || streak === 30 || streak % 30 === 0);
+    
+    // Directly compute showCelebration from props
+    const [showCelebration, setShowCelebration] = useState(isMilestone);
 
     useEffect(() => {
         // Update window size for confetti
@@ -34,15 +36,14 @@ export default function StreakCelebration({ streak, onClose }: StreakCelebration
     }, []);
 
     useEffect(() => {
-        if (isMilestone) {
-            setShowCelebration(true);
-            // Auto-hide after 5 seconds
-            const timer = setTimeout(() => {
-                setShowCelebration(false);
-                onClose?.();
-            }, 5000);
-            return () => clearTimeout(timer);
-        }
+        if (!isMilestone) return;
+        
+        // Auto-hide after 5 seconds
+        const timer = setTimeout(() => {
+            setShowCelebration(false);
+            onClose?.();
+        }, 5000);
+        return () => clearTimeout(timer);
     }, [streak, isMilestone, onClose]);
 
     const getMilestoneMessage = () => {
