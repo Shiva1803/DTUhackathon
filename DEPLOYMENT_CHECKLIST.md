@@ -106,7 +106,7 @@ curl http://localhost:3001/health
 Add these 4 variables:
 
 1. **VITE_API_URL**
-   - Value: `http://YOUR_VULTR_IP:3001`
+   - Value: `https://your-backend-url`
    - [ ] Added
 
 2. **VITE_AUTH0_DOMAIN**
@@ -227,12 +227,12 @@ Visit: `https://your-vercel-url.vercel.app`
 
 ### Your URLs:
 - **Frontend**: `https://your-vercel-url.vercel.app`
-- **Backend**: `http://YOUR_VULTR_IP:3001`
-- **Health Check**: `http://YOUR_VULTR_IP:3001/health`
+- **Backend**: `https://your-backend-url`
+- **Health Check**: `https://your-backend-url/health`
 
 ### Share These URLs:
 - Demo URL: `https://your-vercel-url.vercel.app`
-- API Docs: `http://YOUR_VULTR_IP:3001`
+- API Docs: `https://your-backend-url`
 - GitHub: `https://github.com/Shiva1803/DTUhackathon`
 
 ---

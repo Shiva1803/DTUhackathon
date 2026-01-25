@@ -3,7 +3,16 @@ import axios, { AxiosError } from 'axios';
 // Create axios instance
 // In development, Vite proxy handles /api -> localhost:3001
 // In production, set VITE_API_URL to your backend URL (e.g., https://api.yourapp.com)
-const baseURL = import.meta.env.VITE_API_URL || '';
+const rawBaseURL = (import.meta.env.VITE_API_URL || '').trim();
+const baseURL = rawBaseURL ? rawBaseURL.replace(/\/$/, '') : '';
+const isLocalhost = /localhost|127\.0\.0\.1/i.test(baseURL);
+
+if (import.meta.env.PROD && (!baseURL || isLocalhost)) {
+  console.error(
+    'VITE_API_URL must be set to your deployed backend URL for production builds. ' +
+    'Update the Vercel environment variable and redeploy.'
+  );
+}
 
 export const api = axios.create({
   baseURL,
