@@ -17,12 +17,17 @@ const parsedHostname = (() => {
   }
 })();
 const isUnparseableURL = Boolean(baseURL) && !parsedHostname;
-const isLocalhost = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(parsedHostname);
+const isLocalhost = [
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  '0.0.0.0',
+  'host.docker.internal',
+].includes(parsedHostname);
 const configurationError = import.meta.env.PROD && (!baseURL || isUnparseableURL || isLocalhost);
 const configurationErrorMessage =
   'VITE_API_URL must be set to your deployed backend URL for production builds. ' +
   'Update your environment variable and redeploy.';
-const configurationErrorInstance = new Error(configurationErrorMessage);
 
 export const api = axios.create({
   baseURL,
@@ -35,7 +40,9 @@ export const api = axios.create({
 if (configurationError) {
   console.error(configurationErrorMessage);
   api.interceptors.request.use((config) => {
-    return Promise.reject(Object.assign(configurationErrorInstance, { config }));
+    const error = new Error(configurationErrorMessage);
+    (error as Error & { config?: typeof config }).config = config;
+    return Promise.reject(error);
   });
 }
 
