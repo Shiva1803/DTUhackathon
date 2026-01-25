@@ -39,14 +39,11 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
-  useEffect(() => { loadSessions(); }, []);
-
-  const getToken = async () => getAccessTokenSilently({
+  const getToken = useCallback(async () => getAccessTokenSilently({
     authorizationParams: { audience: import.meta.env.VITE_AUTH0_AUDIENCE }
-  });
+  }), [getAccessTokenSilently]);
 
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
     try {
       const token = await getToken();
       const response = await getChatSessions(token);
@@ -54,7 +51,10 @@ export default function ChatPage() {
     } catch (err) {
       console.error('Error loading sessions:', err);
     }
-  };
+  }, [getToken]);
+
+  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+  useEffect(() => { loadSessions(); }, [loadSessions]);
 
   const loadSessionHistory = async (sessionId: string) => {
     setLoading(true);

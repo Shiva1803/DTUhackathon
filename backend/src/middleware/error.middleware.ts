@@ -115,8 +115,7 @@ const handleJwtError = (error: { code?: string; message?: string }): AppError =>
  */
 export const notFoundHandler = (
   req: Request,
-  res: Response,
-  _next: NextFunction
+  res: Response
 ): void => {
   res.status(404).json(
     errorResponse(`Route ${req.method} ${req.originalUrl} not found`, 404)
@@ -130,8 +129,7 @@ export const notFoundHandler = (
 export const errorHandler = (
   error: Error & { statusCode?: number; code?: string; status?: number; keyValue?: Record<string, unknown> },
   req: Request,
-  res: Response,
-  _next: NextFunction
+  res: Response
 ): void => {
   let appError: AppError;
 

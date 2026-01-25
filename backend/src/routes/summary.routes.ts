@@ -2,11 +2,9 @@ import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../types/express';
 import { authenticate } from '../middleware/auth.middleware';
 import { asyncHandler, NotFoundError } from '../middleware/error.middleware';
-import { successResponse, paginatedResponse, parsePagination } from '../utils/response';
+import { successResponse } from '../utils/response';
 import { aiService } from '../services/ai.service';
-import { Summary } from '../models/Summary';
 import { logger } from '../utils/logger';
-import mongoose from 'mongoose';
 
 const router = Router();
 

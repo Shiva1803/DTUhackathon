@@ -1,8 +1,8 @@
 import { AudioLog, IAudioLog } from '../models/AudioLog';
 import { Summary, ISummary, IMetrics } from '../models/Summary';
-import { ChatMessage, IChatMessage } from '../models/ChatMessage';
+import { ChatMessage } from '../models/ChatMessage';
 import { logger } from '../utils/logger';
-import { getWeekStart, getWeekEnd, getWeekId } from '../utils/week.utils';
+import { getWeekStart, getWeekEnd } from '../utils/week.utils';
 import mongoose from 'mongoose';
 
 /**

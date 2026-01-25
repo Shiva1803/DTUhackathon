@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import type { File as MulterFile } from 'multer';
 
 /**
  * Extended Express Request with authenticated user
@@ -21,6 +22,7 @@ export interface AuthenticatedRequest extends Request {
     email: string;         // User email
     name?: string;         // User display name
   };
+  file?: MulterFile;
 }
 
 /**

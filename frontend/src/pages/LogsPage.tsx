@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -402,7 +402,7 @@ export default function LogsPage() {
   const [logToDelete, setLogToDelete] = useState<AudioLog | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const fetchLogs = async (page: number = 1) => {
+  const fetchLogs = useCallback(async (page: number = 1) => {
     setLoading(true);
     setError(null);
     try {
@@ -423,9 +423,9 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getAccessTokenSilently]);
 
-  useEffect(() => { fetchLogs(); }, []);
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
   const handlePlayPause = (log: AudioLog) => {
     if (!log.audioUrl) return;
