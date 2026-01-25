@@ -16,9 +16,9 @@ const parsedHostname = (() => {
     return '';
   }
 })();
-const isInvalidBaseURL = Boolean(baseURL) && !parsedHostname;
+const isUnparseableURL = Boolean(baseURL) && !parsedHostname;
 const isLocalhost = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(parsedHostname);
-const configurationError = import.meta.env.PROD && (!baseURL || isInvalidBaseURL || isLocalhost);
+const configurationError = import.meta.env.PROD && (!baseURL || isUnparseableURL || isLocalhost);
 const configurationErrorMessage =
   'VITE_API_URL must be set to your deployed backend URL for production builds. ' +
   'Update the Vercel environment variable and redeploy.';
@@ -34,7 +34,8 @@ export const api = axios.create({
 
 if (configurationError) {
   console.error(configurationErrorMessage);
-  api.interceptors.request.use(() => {
+  api.interceptors.request.use((config) => {
+    void config;
     return Promise.reject(configurationErrorInstance);
   });
 }
