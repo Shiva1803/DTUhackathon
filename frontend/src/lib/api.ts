@@ -5,11 +5,24 @@ import axios, { AxiosError } from 'axios';
 // In production, set VITE_API_URL to your backend URL (e.g., https://api.yourapp.com)
 const rawBaseURL = (import.meta.env.VITE_API_URL || '').trim();
 const baseURL = rawBaseURL ? rawBaseURL.replace(/\/$/, '') : '';
-const isLocalhost = /localhost|127\.0\.0\.1|::1|0\.0\.0\.0/i.test(baseURL);
-const configurationError = import.meta.env.PROD && (!baseURL || isLocalhost);
+const parsedHostname = (() => {
+  if (!baseURL) {
+    return '';
+  }
+
+  try {
+    return new URL(baseURL).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+})();
+const isInvalidBaseURL = Boolean(baseURL) && !parsedHostname;
+const isLocalhost = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(parsedHostname);
+const configurationError = import.meta.env.PROD && (!baseURL || isInvalidBaseURL || isLocalhost);
 const configurationErrorMessage =
   'VITE_API_URL must be set to your deployed backend URL for production builds. ' +
   'Update the Vercel environment variable and redeploy.';
+const configurationErrorInstance = new Error(configurationErrorMessage);
 
 export const api = axios.create({
   baseURL,
@@ -22,7 +35,7 @@ export const api = axios.create({
 if (configurationError) {
   console.error(configurationErrorMessage);
   api.interceptors.request.use(() => {
-    return Promise.reject(new Error(configurationErrorMessage));
+    return Promise.reject(configurationErrorInstance);
   });
 }
 
