@@ -39,7 +39,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  const getToken = useCallback(() => getAccessTokenSilently({
+  const getToken = useCallback(async () => getAccessTokenSilently({
     authorizationParams: { audience: import.meta.env.VITE_AUTH0_AUDIENCE }
   }), [getAccessTokenSilently]);
 
