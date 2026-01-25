@@ -28,7 +28,9 @@ const hasBaseURL = Boolean(baseURL);
 const isUnparseableURL = hasBaseURL && !parsedHostname;
 const isLocalhost = LOCALHOST_HOSTNAMES.includes(parsedHostname);
 const isProduction = import.meta.env.PROD;
-const configurationError = isProduction && (!hasBaseURL || isUnparseableURL || isLocalhost);
+const isMissingURL = !hasBaseURL;
+const isInvalidHost = isUnparseableURL || isLocalhost;
+const configurationError = isProduction && (isMissingURL || isInvalidHost);
 const configurationErrorMessage =
   'VITE_API_URL must be set to your deployed backend URL for production builds. ' +
   'Update your environment variable and redeploy.';
@@ -44,7 +46,7 @@ export const api = axios.create({
 if (configurationError) {
   console.error(configurationErrorMessage);
   api.interceptors.request.use((config) => {
-    const error = new AxiosError(configurationErrorMessage, 'ERR_INVALID_API_URL', config);
+    const error = new AxiosError(configurationErrorMessage, 'ERR_INVALID_URL', config);
     return Promise.reject(error);
   });
 }
