@@ -6,12 +6,13 @@ import axios, { AxiosError } from 'axios';
 const rawBaseURL = (import.meta.env.VITE_API_URL || '').trim();
 const baseURL = rawBaseURL ? rawBaseURL.replace(/\/$/, '') : '';
 const isLocalhost = /localhost|127\.0\.0\.1/i.test(baseURL);
+const configurationError = import.meta.env.PROD && (!baseURL || isLocalhost);
+const configurationErrorMessage =
+  'VITE_API_URL must be set to your deployed backend URL for production builds. ' +
+  'Update the Vercel environment variable and redeploy.';
 
-if (import.meta.env.PROD && (!baseURL || isLocalhost)) {
-  console.error(
-    'VITE_API_URL must be set to your deployed backend URL for production builds. ' +
-    'Update the Vercel environment variable and redeploy.'
-  );
+if (configurationError) {
+  console.error(configurationErrorMessage);
 }
 
 export const api = axios.create({
@@ -21,6 +22,12 @@ export const api = axios.create({
   },
   timeout: 30000,
 });
+
+if (configurationError) {
+  api.interceptors.request.use(() => {
+    return Promise.reject(new Error(configurationErrorMessage));
+  });
+}
 
 // Response interceptor for error handling
 api.interceptors.response.use(
