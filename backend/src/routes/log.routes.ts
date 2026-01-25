@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
-import multer from 'multer';
+import multer, { FileFilterCallback } from 'multer';
+import type { Request } from 'express';
 import { AuthenticatedRequest } from '../types/express';
 import { authenticate } from '../middleware/auth.middleware';
 import { asyncHandler, ValidationError } from '../middleware/error.middleware';
@@ -39,7 +40,7 @@ const upload = multer({
   limits: {
     fileSize: MAX_FILE_SIZE,
   },
-  fileFilter: (_req, file, cb) => {
+  fileFilter: (_req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
     if (ALLOWED_AUDIO_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -53,7 +54,7 @@ const upload = multer({
 /**
  * Handle multer errors (file size, etc.)
  */
-const handleMulterError = (err: Error, res: Response): boolean => {
+const handleMulterError = (err: unknown, res: Response): boolean => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       res.status(400).json({
@@ -98,7 +99,7 @@ router.post(
   authenticate,
   (req: AuthenticatedRequest, res: Response, next: (err?: Error) => void) => {
     // Custom wrapper to handle multer errors properly
-    upload.single('audio')(req, res, (err) => {
+    upload.single('audio')(req, res, (err?: unknown) => {
       if (err) {
         if (handleMulterError(err, res)) return;
         if (err instanceof ValidationError) {
@@ -108,7 +109,7 @@ router.post(
           });
           return;
         }
-        next(err);
+        next(err instanceof Error ? err : new Error('File upload failed'));
         return;
       }
       next();

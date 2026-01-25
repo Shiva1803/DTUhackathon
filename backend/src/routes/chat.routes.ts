@@ -3,7 +3,7 @@ import { AuthenticatedRequest } from '../types/express';
 import { authenticate } from '../middleware/auth.middleware';
 import { asyncHandler, ValidationError } from '../middleware/error.middleware';
 import { successResponse, paginatedResponse, parsePagination } from '../utils/response';
-import { chatService, generateSessionId } from '../services/chat.service';
+import { chatService } from '../services/chat.service';
 import { logger } from '../utils/logger';
 
 const router = Router();

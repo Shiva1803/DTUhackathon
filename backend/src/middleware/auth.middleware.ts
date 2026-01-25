@@ -139,7 +139,7 @@ export const optionalAuth = async (
       // Token valid, attach user
       await attachUser(req, res, next);
     });
-  } catch (error) {
+  } catch {
     // Continue without authentication on error
     next();
   }
