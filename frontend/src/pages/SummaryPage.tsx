@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -317,7 +317,7 @@ export default function SummaryPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const token = await getAccessTokenSilently({ authorizationParams: { audience: import.meta.env.VITE_AUTH0_AUDIENCE } });
       const response = await getActivitySummary(token);
@@ -329,7 +329,7 @@ export default function SummaryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getAccessTokenSilently]);
 
   const handleRefreshReview = async () => {
     setRefreshing(true);
@@ -344,7 +344,7 @@ export default function SummaryPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (!themeLoaded || loading) return <SummaryPreloader isDark={isDark} />;
 
