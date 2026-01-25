@@ -15,9 +15,9 @@ ENVIRONMENT VARIABLES (Add all 4):
 ─────────────────────────────────────────────────────────
 
 1. VITE_API_URL
-   Value: http://YOUR_VULTR_SERVER_IP:3001
-   (Replace YOUR_VULTR_SERVER_IP with actual IP)
-   Example: http://45.76.123.456:3001
+   Value: https://your-backend-url
+   (Replace with your deployed backend URL)
+   Example: https://api.yourdomain.com
 
 2. VITE_AUTH0_DOMAIN
    Value: dev-yx6bvvjlq1p3lwvi.us.auth0.com

@@ -3,7 +3,37 @@ import axios, { AxiosError } from 'axios';
 // Create axios instance
 // In development, Vite proxy handles /api -> localhost:3001
 // In production, set VITE_API_URL to your backend URL (e.g., https://api.yourapp.com)
-const baseURL = import.meta.env.VITE_API_URL || '';
+const LOCALHOST_HOSTNAMES = [
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  '0.0.0.0',
+  'host.docker.internal',
+];
+
+const rawBaseURL = (import.meta.env.VITE_API_URL || '').trim();
+const baseURL = rawBaseURL ? rawBaseURL.replace(/\/$/, '') : '';
+const parsedHostname = (() => {
+  if (!baseURL) {
+    return '';
+  }
+
+  try {
+    return new URL(baseURL).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+})();
+const hasBaseURL = Boolean(baseURL);
+const isUnparseableURL = hasBaseURL && !parsedHostname;
+const isLocalhost = LOCALHOST_HOSTNAMES.includes(parsedHostname);
+const isProduction = import.meta.env.PROD;
+const isMissingURL = !hasBaseURL;
+const isInvalidHost = isUnparseableURL || isLocalhost;
+const configurationError = isProduction && (isMissingURL || isInvalidHost);
+const configurationErrorMessage =
+  'VITE_API_URL must be set to your deployed backend URL for production builds. ' +
+  'Update your environment variable and redeploy.';
 
 export const api = axios.create({
   baseURL,
@@ -12,6 +42,14 @@ export const api = axios.create({
   },
   timeout: 30000,
 });
+
+if (configurationError) {
+  console.error(configurationErrorMessage);
+  api.interceptors.request.use((config) => {
+    const error = new AxiosError(configurationErrorMessage, 'ERR_INVALID_URL', config);
+    return Promise.reject(error);
+  });
+}
 
 // Response interceptor for error handling
 api.interceptors.response.use(

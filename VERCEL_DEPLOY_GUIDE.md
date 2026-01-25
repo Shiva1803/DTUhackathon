@@ -45,10 +45,9 @@ Click **"Environment Variables"** section and add these **4 variables**:
 
 ### Variable 1: VITE_API_URL
 - **Name**: `VITE_API_URL`
-- **Value**: `http://YOUR_VULTR_IP:3001`
-  - Replace `YOUR_VULTR_IP` with your actual Vultr server IP
-  - Example: `http://45.76.123.456:3001`
-  - If you setup domain: `https://api.yourdomain.com`
+- **Value**: `https://your-backend-url`
+  - Replace with your actual backend URL (Railway/Render/Vultr domain)
+  - Example: `https://api.yourdomain.com`
 
 ### Variable 2: VITE_AUTH0_DOMAIN
 - **Name**: `VITE_AUTH0_DOMAIN`
@@ -144,12 +143,12 @@ pm2 restart parallax-api
 
 ### Your URLs:
 - **Frontend**: `https://your-vercel-url.vercel.app`
-- **Backend**: `http://YOUR_VULTR_IP:3001`
-- **Health Check**: `http://YOUR_VULTR_IP:3001/health`
+- **Backend**: `https://your-backend-url`
+- **Health Check**: `https://your-backend-url/health`
 
 ### Environment Variables (Vercel):
 ```
-VITE_API_URL=http://YOUR_VULTR_IP:3001
+VITE_API_URL=https://your-backend-url
 VITE_AUTH0_DOMAIN=dev-yx6bvvjlq1p3lwvi.us.auth0.com
 VITE_AUTH0_CLIENT_ID=bBPurXakQQEKIRCL7WUnar0PfUrWqqnt
 VITE_AUTH0_AUDIENCE=https://myapp/api

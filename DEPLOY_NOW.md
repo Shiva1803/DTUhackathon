@@ -19,12 +19,12 @@
    - Output Directory: `dist`
 
 4. **Add Environment Variables**:
-   ```
-   VITE_API_URL=http://localhost:3001
-   VITE_AUTH0_DOMAIN=dev-yx6bvvjlq1p3lwvi.us.auth0.com
-   VITE_AUTH0_CLIENT_ID=bBPurXakQQEKIRCL7WUnar0PfUrWqqnt
-   VITE_AUTH0_AUDIENCE=https://myapp/api
-   ```
+    ```
+    VITE_API_URL=https://your-backend-url
+    VITE_AUTH0_DOMAIN=dev-yx6bvvjlq1p3lwvi.us.auth0.com
+    VITE_AUTH0_CLIENT_ID=bBPurXakQQEKIRCL7WUnar0PfUrWqqnt
+    VITE_AUTH0_AUDIENCE=https://myapp/api
+    ```
 
 5. **Deploy**:
    - Click "Deploy"
